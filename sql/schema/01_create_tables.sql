@@ -28,6 +28,15 @@ CREATE TABLE IF NOT EXISTS document_holder (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(department_id) REFERENCES department(id) ON DELETE RESTRICT,
     FOREIGN KEY(created_by) REFERENCES app_user(id) ON DELETE SET NULL
+    -- Add to document_holder table:
+    current_holder_user_id INTEGER,          -- who physically has the file
+    current_holder_department_id INTEGER,    -- which dept currently holds it (not owns it)
+    last_movement_id INTEGER,               -- denormalized for fast lookup
+    status TEXT NOT NULL DEFAULT 'Active' CHECK(status IN ('Open', 'Active', 'Closed')),
+
+    FOREIGN KEY(current_holder_user_id) REFERENCES app_user(id),
+    FOREIGN KEY(current_holder_department_id) REFERENCES department(id),
+    FOREIGN KEY(last_movement_id) REFERENCES document_movement(id)
 );
 
 -- Document versions (one-to-many)
@@ -104,4 +113,15 @@ AFTER INSERT ON document_version
 BEGIN
   INSERT INTO tbl_reader_log(code, log_status, log_message)
   VALUES('DOC_VERSION_ADD', 'SUCCESS', 'Added version ' || NEW.version_no || ' for doc_id=' || NEW.document_id);
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_update_holder_after_movement
+AFTER INSERT ON document_movement
+BEGIN
+  UPDATE document_holder
+  SET
+    current_holder_department_id = NEW.to_department_id,
+    current_holder_user_id = NEW.moved_by,
+    last_movement_id = NEW.id
+  WHERE id = NEW.document_id;
 END;
