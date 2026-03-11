@@ -1,38 +1,15 @@
 -- ============================================================
 -- migrate.sql
 -- Safe migration for existing township.db instances.
---
 -- Run this INSTEAD of 01_create_tables.sql if you already
 -- have data in the database.
---
--- What this does:
---   1. Adds the 3 new columns to document_holder (ALTER TABLE)
---   2. Drops & recreates triggers (safe — triggers have no data)
---   3. Backfills current_holder_* and last_movement_id from
---      existing document_movement rows
---   4. Adds new indexes
---
--- What this does NOT do:
---   · Drop any table
---   · Delete any row
---   · Break existing data
---
--- NOTE: SQLite does not support ADD CONSTRAINT on existing tables.
---       The CHECK(status IN (...)) will only be enforced on NEW
---       rows after migration. Existing rows are untouched.
---       If you need strict enforcement on old rows, run the
---       validation query at the bottom first.
 -- ============================================================
 
 PRAGMA foreign_keys = ON;
 
 -- ------------------------------------------------------------
 -- STEP 1: Add new columns to document_holder
--- Each is wrapped in a separate ALTER TABLE.
--- SQLite ignores "duplicate column" errors only via try/catch
--- in application code — here we use a safe pattern via a
--- temp check. Run each line; if the column already exists,
--- SQLite will return an error you can safely ignore.
+-- If a column already exists SQLite will error — safe to ignore.
 -- ------------------------------------------------------------
 
 ALTER TABLE document_holder ADD COLUMN current_holder_user_id       INTEGER REFERENCES app_user (id);
@@ -40,8 +17,32 @@ ALTER TABLE document_holder ADD COLUMN current_holder_department_id INTEGER REFE
 ALTER TABLE document_holder ADD COLUMN last_movement_id             INTEGER REFERENCES document_movement (id);
 
 -- ------------------------------------------------------------
--- STEP 2: Drop old triggers and recreate all three cleanly
--- (DROP IF EXISTS is safe even if they never existed)
+-- STEP 2: Create role table (new)
+-- ------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS role (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    role_name TEXT    NOT NULL UNIQUE
+);
+
+INSERT OR IGNORE INTO role (id, role_name) VALUES (1, 'Admin'), (2, 'Manager'), (3, 'User');
+
+-- ------------------------------------------------------------
+-- STEP 3: Add auth columns to app_user
+-- Matches the senior's tblUser schema.
+-- ------------------------------------------------------------
+
+ALTER TABLE app_user ADD COLUMN password    TEXT;
+ALTER TABLE app_user ADD COLUMN email       TEXT;
+ALTER TABLE app_user ADD COLUMN phone       TEXT;
+ALTER TABLE app_user ADD COLUMN role_id     INTEGER REFERENCES role (id);
+ALTER TABLE app_user ADD COLUMN is_active   INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE app_user ADD COLUMN is_deleted  INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE app_user ADD COLUMN created_by  INTEGER;
+ALTER TABLE app_user ADD COLUMN updated_at  DATETIME;
+
+-- ------------------------------------------------------------
+-- STEP 4: Drop old triggers and recreate all cleanly
 -- ------------------------------------------------------------
 
 DROP TRIGGER IF EXISTS trg_update_current_version_after_insert;
@@ -85,15 +86,14 @@ BEGIN
 END;
 
 -- ------------------------------------------------------------
--- STEP 3: Add new indexes (IF NOT EXISTS = safe to re-run)
+-- STEP 5: Add new indexes
 -- ------------------------------------------------------------
 
 CREATE INDEX IF NOT EXISTS idx_document_holder_dept ON document_holder (current_holder_department_id);
+CREATE INDEX IF NOT EXISTS idx_user_role            ON app_user         (role_id);
 
 -- ------------------------------------------------------------
--- STEP 4: Backfill current_holder_* and last_movement_id
--- from the most recent movement row per document.
--- This brings existing documents in sync with the new triggers.
+-- STEP 6: Backfill document_holder holder columns
 -- ------------------------------------------------------------
 
 UPDATE document_holder
@@ -101,34 +101,30 @@ SET
     last_movement_id             = (
         SELECT id FROM document_movement
         WHERE  document_id = document_holder.id
-        ORDER  BY moved_at DESC
-        LIMIT  1
+        ORDER  BY moved_at DESC LIMIT 1
     ),
     current_holder_department_id = (
         SELECT to_department_id FROM document_movement
         WHERE  document_id = document_holder.id
-        ORDER  BY moved_at DESC
-        LIMIT  1
+        ORDER  BY moved_at DESC LIMIT 1
     ),
     current_holder_user_id       = (
         SELECT moved_by FROM document_movement
         WHERE  document_id = document_holder.id
-        ORDER  BY moved_at DESC
-        LIMIT  1
+        ORDER  BY moved_at DESC LIMIT 1
     );
 
 -- ------------------------------------------------------------
--- STEP 5: Validation queries — run these to confirm migration.
--- Uncomment and run manually to check.
+-- STEP 7: Update existing admin seed user with password
 -- ------------------------------------------------------------
 
--- Check no document has an invalid status value:
--- SELECT id, reference_no, status FROM document_holder
--- WHERE status NOT IN ('Open', 'Active', 'Closed');
+UPDATE app_user
+SET    password = 'Admin@123', role_id = 1, is_active = 1, is_deleted = 0
+WHERE  username = 'admin';
 
--- Check holder backfill worked:
--- SELECT id, reference_no, current_holder_department_id, last_movement_id
--- FROM document_holder;
-
--- Confirm all 3 triggers exist:
+-- ------------------------------------------------------------
+-- Validation (uncomment to check manually):
 -- SELECT name FROM sqlite_master WHERE type = 'trigger';
+-- SELECT id, username, password, role_id, is_active FROM app_user;
+-- SELECT * FROM role;
+-- ------------------------------------------------------------
