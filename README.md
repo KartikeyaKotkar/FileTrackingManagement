@@ -6,7 +6,7 @@ FastAPI
 SQLite
 React
 Serial (RFID)
-
+```
 Architecture
 ------------
 RFID Reader
@@ -16,3 +16,4 @@ FastAPI API
 SQLite Database
    ↓
 React Dashboard
+```
