@@ -9,12 +9,13 @@ class SQLRegistry:
         self.versions = {}
         self.movement = {}
         self.logs = {}
+        self.users = {}
 
         self._load_queries()
 
     def _load_queries(self):
 
-        for category in ["documents", "versions", "movement", "logs"]:
+        for category in ["documents", "versions", "movement", "logs", "users"]:
             folder = BASE_DIR / category
 
             queries = {}
