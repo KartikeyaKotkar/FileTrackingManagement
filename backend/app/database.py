@@ -2,7 +2,7 @@ import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 
-DB_PATH = "township.db"
+DB_PATH = "main.db"
 
 
 # -----------------------------
@@ -42,6 +42,48 @@ def fetch_one(query, params=()):
         cur = conn.cursor()
         row = cur.execute(query, params).fetchone()
         return dict(row) if row else None
+
+
+# -----------------------------
+# Auth: login lookup
+# -----------------------------
+def get_user_by_login(login: str, password: str):
+    """
+    Matches username OR email + password.
+    Returns user dict (without password) or None.
+    """
+    from app.sql_loader import sql
+
+    return fetch_one(
+        sql.users.get_user_by_login,
+        (login, login, password),  # login passed twice: for username + email check
+    )
+
+
+# -----------------------------
+# Auth: create user
+# -----------------------------
+def create_user(username, fullname, password, email, phone, role_id, created_by):
+    from app.sql_loader import sql
+
+    with get_conn() as conn:
+        cur = conn.cursor()
+
+        try:
+            cur.execute("BEGIN")
+
+            cur.execute(
+                sql.users.create_user,
+                (username, fullname, password, email, phone, role_id, created_by),
+            )
+
+            user_id = cur.lastrowid
+            cur.execute("COMMIT")
+            return user_id
+
+        except Exception:
+            cur.execute("ROLLBACK")
+            raise
 
 
 # -----------------------------
@@ -95,7 +137,6 @@ def create_document_with_version(
             )
 
             cur.execute("COMMIT")
-
             return doc_id
 
         except Exception:
@@ -134,7 +175,6 @@ def add_version(
             )
 
             cur.execute("COMMIT")
-
             return cur.lastrowid
 
         except Exception:
