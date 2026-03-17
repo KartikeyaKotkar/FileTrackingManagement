@@ -1,7 +1,6 @@
-from fastapi import FastAPI
-
 from app.routers import documents, movement, versions
 from app.routers.auth import router as auth_router
+from fastapi import FastAPI
 
 app = FastAPI(title="File Tracking System")
 
