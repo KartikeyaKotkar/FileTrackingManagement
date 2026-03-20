@@ -65,7 +65,33 @@ uv pip install <package> && uv pip freeze > requirements.txt
 - `X-Admin-Key: filetracker-admin-2025` is required for `/auth/register` and `/auth/users`
 - Status field on `document_holder` is constrained to `'Open' | 'Active' | 'Closed'`
 
-## Agent Docs
+## Agent System
 
-- `agent_docs/audit.md` — what to check during a backend audit
-- `agent_docs/schema.md` — DB schema reference and trigger behaviour
+This project uses a structured agent system under `agent_docs/`.
+
+### Structure
+
+- `agents/` — agent personas (who performs the task)
+- `tasks/` — task definitions (what to do)
+- `context/` — project knowledge (schema, architecture, rules)
+- `commands/` — preconfigured workflows (recommended entrypoints)
+
+### Available Commands
+
+- `commands/audit.md`
+  - Runs a full backend audit using:
+    - `agents/backend-auditor.md`
+    - `tasks/audit.md`
+    - `context/schema.md`
+
+- `commands/docs.md`
+  - Generates full project documentation after audit
+
+### Usage
+
+Prefer using commands instead of manually selecting files.
+
+Example:
+> Run the audit command
+
+This ensures consistent agent + task + context composition.
