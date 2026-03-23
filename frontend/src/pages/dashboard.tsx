@@ -18,9 +18,13 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [createModal, setCreateModal] = useState(false);
+  const [createUserModal, setCreateUserModal] = useState(false);
+  const [createDeptModal, setCreateDeptModal] = useState(false);
   
   // Create state
   const [newDoc, setNewDoc] = useState({ reference_no: "", title: "", department_id: 1 });
+  const [newUser, setNewUser] = useState({ username: "", password: "", role: "user" });
+  const [newDept, setNewDept] = useState({ name: "" });
   const [createLoading, setCreateLoading] = useState(false);
 
   const navigate = useNavigate();
@@ -68,6 +72,38 @@ export default function Dashboard() {
     } catch (err) {
       console.error(err);
       alert("Failed to create document.");
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreateLoading(true);
+    try {
+      await api.post("/auth/users", newUser);
+      setCreateUserModal(false);
+      setNewUser({ username: "", password: "", role: "user" });
+      alert("User created successfully!");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to create user.");
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
+  const handleCreateDept = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreateLoading(true);
+    try {
+      await api.post("/departments/", newDept);
+      setCreateDeptModal(false);
+      setNewDept({ name: "" });
+      alert("Department created successfully!");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to create department.");
     } finally {
       setCreateLoading(false);
     }
@@ -227,11 +263,27 @@ export default function Dashboard() {
                  <h2 className="text-2xl font-bold text-gray-900">Settings</h2>
                  <p className="text-gray-500 text-sm mt-1">Manage your account and system preferences.</p>
                </div>
-               <div className="bg-white p-12 rounded-xl border border-gray-200 shadow-sm text-center">
-                  <Settings className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">Settings functionality goes here</h3>
-                  <p className="text-gray-500">This page acts as a placeholder for user preferences and system configuration.</p>
-               </div>
+               
+               {user?.role_id === 1 ? (
+                 <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                   <h3 className="text-lg font-bold text-gray-900 mb-4">Admin Control Panel</h3>
+                   <div className="flex gap-4">
+                     <button onClick={() => setCreateUserModal(true)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
+                       Create User
+                     </button>
+                     <button onClick={() => setCreateDeptModal(true)} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors">
+                       Create Department
+                     </button>
+                   </div>
+                   <p className="text-sm text-gray-500 mt-4">These actions are strictly protected by backend RBAC and will fail if accessed by non-admins.</p>
+                 </div>
+               ) : (
+                 <div className="bg-white p-12 rounded-xl border border-gray-200 shadow-sm text-center">
+                    <Settings className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">Personal Settings</h3>
+                    <p className="text-gray-500">Regular user settings and preferences are currently under development.</p>
+                 </div>
+               )}
             </div>
           )}
 
@@ -267,6 +319,61 @@ export default function Dashboard() {
               <div className="pt-4 flex justify-end gap-3">
                 <button type="button" onClick={() => setCreateModal(false)} className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg">Cancel</button>
                 <button type="submit" disabled={createLoading} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50">Create</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Create User Modal */}
+      {createUserModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 p-4">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-md overflow-hidden relative">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-semibold text-lg">Create New User</h3>
+              <button onClick={() => setCreateUserModal(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5"/></button>
+            </div>
+            <form onSubmit={handleCreateUser} className="p-6 space-y-4">
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">Username</label>
+                <input required type="text" value={newUser.username} onChange={(e) => setNewUser({...newUser, username: e.target.value})} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="jane.doe" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">Password</label>
+                <input required type="password" value={newUser.password} onChange={(e) => setNewUser({...newUser, password: e.target.value})} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="••••••••" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">Role</label>
+                <select value={newUser.role} onChange={(e) => setNewUser({...newUser, role: e.target.value})} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500">
+                  <option value="user">Standard User</option>
+                  <option value="admin">Administrator</option>
+                </select>
+              </div>
+              <div className="pt-4 flex justify-end gap-3">
+                <button type="button" onClick={() => setCreateUserModal(false)} className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg">Cancel</button>
+                <button type="submit" disabled={createLoading} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50">Create User</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Create Department Modal */}
+      {createDeptModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 p-4">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-md overflow-hidden relative">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-semibold text-lg">Create Department</h3>
+              <button onClick={() => setCreateDeptModal(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5"/></button>
+            </div>
+            <form onSubmit={handleCreateDept} className="p-6 space-y-4">
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">Department Name</label>
+                <input required type="text" value={newDept.name} onChange={(e) => setNewDept({...newDept, name: e.target.value})} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Marketing" />
+              </div>
+              <div className="pt-4 flex justify-end gap-3">
+                <button type="button" onClick={() => setCreateDeptModal(false)} className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg">Cancel</button>
+                <button type="submit" disabled={createLoading} className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50">Create Department</button>
               </div>
             </form>
           </div>
