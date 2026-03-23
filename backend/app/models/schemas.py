@@ -79,6 +79,9 @@ class UserResponse(BaseModel):
 
 class DepartmentCreate(BaseModel):
     name: str
+    description: str | None = None
+    created_by: int | None = None
 
 class DepartmentUpdate(BaseModel):
     name: str
+    description: str | None = None
