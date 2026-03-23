@@ -1,4 +1,4 @@
-from app.routers import documents, movement, versions, departments, files
+from app.routers import documents, movement, versions, departments, files, admin
 from app.routers.auth import router as auth_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,7 +23,9 @@ app.include_router(versions.router)
 app.include_router(movement.router)
 app.include_router(departments.router)
 app.include_router(files.router)
+app.include_router(admin.router)
 
 @app.get("/")
 def root():
     return {"message": "File Tracking System Running"}
+
