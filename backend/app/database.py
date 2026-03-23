@@ -120,8 +120,13 @@ def create_document(reference_no, title, department_id, created_by):
                 (reference_no, title, department_id, created_by),
             )
 
+            doc_id = cur.lastrowid
             cur.execute("COMMIT")
-            return cur.lastrowid
+            
+            from app.events import log_file_event
+            log_file_event(file_id=doc_id, action="created", performed_by=created_by, to_department=department_id)
+
+            return doc_id
 
         except Exception:
             cur.execute("ROLLBACK")
@@ -155,8 +160,13 @@ def add_version(
                 ),
             )
 
+            version_id = cur.lastrowid
             cur.execute("COMMIT")
-            return cur.lastrowid
+            
+            from app.events import log_file_event
+            log_file_event(file_id=document_id, action="updated", performed_by=created_by)
+
+            return version_id
 
         except Exception:
             cur.execute("ROLLBACK")
@@ -200,6 +210,9 @@ def move_document(
             )
 
             cur.execute("COMMIT")
+            
+            from app.events import log_file_event
+            log_file_event(file_id=document_id, action="moved", performed_by=moved_by, from_department=from_dept, to_department=to_dept)
 
         except Exception:
             cur.execute("ROLLBACK")
