@@ -1,7 +1,11 @@
-from app.routers import documents, movement, versions, departments
+from app.routers import documents, movement, versions, departments, files
 from app.routers.auth import router as auth_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.events import init_events_db
+
+# Initialize the event DB schema
+init_events_db()
 
 app = FastAPI(title="File Tracking System")
 
@@ -18,7 +22,7 @@ app.include_router(documents.router)
 app.include_router(versions.router)
 app.include_router(movement.router)
 app.include_router(departments.router)
-
+app.include_router(files.router)
 
 @app.get("/")
 def root():
