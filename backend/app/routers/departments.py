@@ -38,19 +38,27 @@ def create_department(data: DepartmentCreate, _ = Depends(require_admin), user_i
             raise HTTPException(status_code=400, detail=str(e))
 
 @router.put("/{dept_id}")
-def update_department(dept_id: int, data: DepartmentUpdate, _ = Depends(require_admin)):
+def update_department(dept_id: int, data: DepartmentUpdate, _ = Depends(require_admin), user_id: int = Depends(get_current_user_id)):
+    row = fetch_one("SELECT created_by FROM department WHERE id = ?", (dept_id,))
+    if not row:
+        raise HTTPException(status_code=404, detail="Department not found")
+    if row["created_by"] != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to modify this department")
+
     with get_conn() as conn:
         cur = conn.cursor()
-        cur.execute("UPDATE department SET name = ? WHERE id = ?", (data.name, dept_id))
-        if cur.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Department not found")
-        return {"status": "updated"}
+        cur.execute("UPDATE department SET name = ?, description = ? WHERE id = ?", (data.name, data.description, dept_id))
+        return {"id": dept_id, "name": data.name, "description": data.description, "created_by": user_id}
 
 @router.delete("/{dept_id}")
-def delete_department(dept_id: int, _ = Depends(require_admin)):
+def delete_department(dept_id: int, _ = Depends(require_admin), user_id: int = Depends(get_current_user_id)):
+    row = fetch_one("SELECT created_by FROM department WHERE id = ?", (dept_id,))
+    if not row:
+        raise HTTPException(status_code=404, detail="Department not found")
+    if row["created_by"] != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this department")
+
     with get_conn() as conn:
         cur = conn.cursor()
         cur.execute("DELETE FROM department WHERE id = ?", (dept_id,))
-        if cur.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Department not found")
         return {"status": "deleted"}
