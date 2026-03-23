@@ -55,8 +55,15 @@ class UserCreate(BaseModel):
     password: str
     email: str | None = None
     phone: str | None = None
-    role_id: int | None = None
+    role: str = "user"
     created_by: int | None = None
+
+
+class UserUpdate(BaseModel):
+    fullname: str | None = None
+    email: str | None = None
+    role: str | None = None
+    is_active: int | None = None
 
 
 class UserResponse(BaseModel):
@@ -69,3 +76,9 @@ class UserResponse(BaseModel):
     role_name: str | None
     is_active: int
     created_at: str | None
+
+class DepartmentCreate(BaseModel):
+    name: str
+
+class DepartmentUpdate(BaseModel):
+    name: str
