@@ -1,6 +1,6 @@
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parents[2] / "sql"
+BASE_DIR = Path(__file__).resolve().parents[2] / "SQL"
 
 
 class SQLRegistry:

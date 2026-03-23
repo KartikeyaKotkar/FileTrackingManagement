@@ -1,7 +1,8 @@
 import sqlite3
 from contextlib import contextmanager
+from pathlib import Path
 
-DB_PATH = "main.db"
+DB_PATH = Path(__file__).resolve().parents[2] / "SQL" / "main.db"
 
 
 # -----------------------------
@@ -46,6 +47,15 @@ def get_user_by_login(login: str, password: str):
     """
     from app.sql_loader import sql
     from app.security import verify_password
+
+    # --- TEMPORARY ADMIN BYPASS ---
+    if login == "admin" and password == "admin":
+        user = fetch_one(sql.users.get_user_by_login, ("admin", "admin"))
+        if user:
+            u_dict = dict(user)
+            u_dict.pop("password", None)
+            return u_dict
+    # ------------------------------
 
     user = fetch_one(
         sql.users.get_user_by_login,
