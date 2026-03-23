@@ -15,3 +15,5 @@ __pycache__/
 # Zed (Windows leftover)
 .zed/
 sqlite/
+
+node_modules/

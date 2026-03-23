@@ -33,7 +33,8 @@ http://127.0.0.1:8000
 
 From the backend root directory:
 
-```
+``` 
+export ADMIN_KEY=replace-with-a-strong-secret
 uvicorn app.main:app --reload
 ```
 
@@ -54,8 +55,19 @@ Request:
 ```json
 {
   "username": "string",
-  "password": "string"
+  "fullname": "string",
+  "password": "string",
+  "email": "string",
+  "phone": "string",
+  "role_id": 1,
+  "created_by": 1
 }
+```
+
+Header required:
+
+```
+X-Admin-Key: <ADMIN_KEY>
 ```
 
 ---
@@ -70,7 +82,7 @@ Request:
 
 ```json
 {
-  "username": "string",
+  "login": "string",
   "password": "string"
 }
 ```
@@ -81,6 +93,12 @@ Request:
 
 ```
 GET /auth/users
+```
+
+Header required:
+
+```
+X-Admin-Key: <ADMIN_KEY>
 ```
 
 ---
@@ -105,8 +123,10 @@ Request:
 
 ```json
 {
+  "reference_no": "DOC-001",
   "title": "string",
-  "description": "string"
+  "department_id": 1,
+  "created_by": 1
 }
 ```
 
@@ -116,6 +136,20 @@ Request:
 
 ```
 GET /documents/{doc_id}
+```
+
+### Update Document Status
+
+```
+PATCH /documents/{doc_id}/status
+```
+
+Request:
+
+```json
+{
+  "status": "Closed"
+}
 ```
 
 ---
@@ -149,7 +183,12 @@ Request:
 ```json
 {
   "document_id": 1,
-  "file_path": "string"
+  "version_no": 2,
+  "file_name": "contract-v2.pdf",
+  "file_path": "files/contract-v2.pdf",
+  "file_hash": "optional",
+  "file_size": 12345,
+  "created_by": 1
 }
 ```
 
@@ -176,9 +215,12 @@ Request:
 ```json
 {
   "document_id": 1,
-  "from_user": "string",
-  "to_user": "string",
-  "status": "string"
+  "from_dept": 1,
+  "to_dept": 2,
+  "movement_type": "Transfer",
+  "approved_by": 1,
+  "moved_by": 1,
+  "remarks": "optional"
 }
 ```
 
@@ -189,7 +231,7 @@ Request:
 ### Creating a Document
 
 1. Call `POST /documents/`
-2. Call `POST /versions/` with the returned document_id
+2. Call `POST /versions/` with the returned document_id when the first file is available
 3. Optionally call `POST /movement/`
 
 ---

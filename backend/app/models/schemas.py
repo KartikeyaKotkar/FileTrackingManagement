@@ -11,6 +11,10 @@ class DocumentCreate(BaseModel):
     created_by: int
 
 
+class DocumentStatusUpdate(BaseModel):
+    status: str
+
+
 # ----------------------------------------
 # Versions
 # ----------------------------------------

@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.database import fetch_all, move_document
+from app.errors import raise_for_write_error
 from app.models.schemas import MovementCreate
 from app.sql_loader import sql
 
@@ -15,15 +16,16 @@ def get_movement_history(document_id: int):
 
 @router.post("/")
 def create_movement(data: MovementCreate):
-
-    move_document(
-        data.document_id,
-        data.from_dept,
-        data.to_dept,
-        data.movement_type,
-        data.approved_by,
-        data.moved_by,
-        data.remarks,
-    )
-
-    return {"status": "movement recorded"}
+    try:
+        move_document(
+            data.document_id,
+            data.from_dept,
+            data.to_dept,
+            data.movement_type,
+            data.approved_by,
+            data.moved_by,
+            data.remarks,
+        )
+        return {"status": "movement recorded"}
+    except Exception as e:
+        raise_for_write_error(e, duplicate_detail="Movement already exists")

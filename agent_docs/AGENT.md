@@ -62,7 +62,7 @@ uv pip install <package> && uv pip freeze > requirements.txt
 - `sql_loader.py` auto-discovers `.sql` files — access via `sql.<category>.<stem>`
 - `document_movement` table must be declared before `document_holder` in schema (FK dependency)
 - Three triggers maintain denormalized columns automatically — do not manually update `current_version_id`, `current_holder_*`, or `last_movement_id`
-- `X-Admin-Key: filetracker-admin-2025` is required for `/auth/register` and `/auth/users`
+- `X-Admin-Key: <ADMIN_KEY>` is required for `/auth/register` and `/auth/users`
 - Status field on `document_holder` is constrained to `'Open' | 'Active' | 'Closed'`
 
 ## Agent System

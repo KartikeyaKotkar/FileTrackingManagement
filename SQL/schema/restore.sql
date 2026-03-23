@@ -1,30 +1,41 @@
+-- ============================================================
+-- restore.sql
+-- Run this to build the full database from scratch.
+-- Command: sqlite3 main.db < restore.sql
+-- ============================================================
+
 PRAGMA foreign_keys = ON;
 PRAGMA journal_mode = WAL;
 
 -- ============================================================
--- TABLE: department
+-- TABLES
 -- ============================================================
+
 CREATE TABLE IF NOT EXISTS department (
     id   INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT    NOT NULL UNIQUE
 );
 
--- ============================================================
--- TABLE: app_user
--- ============================================================
-CREATE TABLE IF NOT EXISTS app_user (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    username   TEXT    NOT NULL UNIQUE,
-    fullname   TEXT,
-    role       TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE IF NOT EXISTS role (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    role_name TEXT    NOT NULL UNIQUE
 );
 
--- ============================================================
--- TABLE: document_movement
--- Must be declared BEFORE document_holder so that
--- last_movement_id FK resolves correctly.
--- ============================================================
+CREATE TABLE IF NOT EXISTS app_user (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    username     TEXT    NOT NULL UNIQUE,
+    fullname     TEXT,
+    password     TEXT,
+    email        TEXT,
+    phone        TEXT,
+    role_id      INTEGER REFERENCES role (id),
+    is_active    INTEGER NOT NULL DEFAULT 1,
+    is_deleted   INTEGER NOT NULL DEFAULT 0,
+    created_by   INTEGER,
+    created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at   DATETIME
+);
+
 CREATE TABLE IF NOT EXISTS document_movement (
     id                 INTEGER PRIMARY KEY AUTOINCREMENT,
     document_id        INTEGER  NOT NULL,
@@ -42,27 +53,15 @@ CREATE TABLE IF NOT EXISTS document_movement (
     FOREIGN KEY (moved_by)           REFERENCES app_user (id)
 );
 
--- ============================================================
--- TABLE: document_holder
--- Tracks ownership, current physical holder, version, status.
---
--- Columns added vs original:
---   current_holder_user_id       → who physically has the file right now
---   current_holder_department_id → which dept physically holds it (≠ owning dept)
---   last_movement_id             → denormalized FK for fast "last movement" lookup
---
--- status enforced to: 'Open' | 'Active' | 'Closed'
--- current_version_id + last_movement_id maintained by triggers (see below)
--- ============================================================
 CREATE TABLE IF NOT EXISTS document_holder (
     id                           INTEGER PRIMARY KEY AUTOINCREMENT,
     reference_no                 TEXT    NOT NULL UNIQUE,
     title                        TEXT    NOT NULL,
-    department_id                INTEGER NOT NULL DEFAULT 1,   -- owning department
-    current_version_id           INTEGER,                      -- → trigger: trg_update_current_version
-    current_holder_user_id       INTEGER,                      -- → trigger: trg_update_holder_after_movement
-    current_holder_department_id INTEGER,                      -- → trigger: trg_update_holder_after_movement
-    last_movement_id             INTEGER,                      -- → trigger: trg_update_holder_after_movement
+    department_id                INTEGER NOT NULL DEFAULT 1,
+    current_version_id           INTEGER,
+    current_holder_user_id       INTEGER,
+    current_holder_department_id INTEGER,
+    last_movement_id             INTEGER,
     status                       TEXT    NOT NULL DEFAULT 'Active'
                                          CHECK (status IN ('Open', 'Active', 'Closed')),
     created_by                   INTEGER,
@@ -74,9 +73,6 @@ CREATE TABLE IF NOT EXISTS document_holder (
     FOREIGN KEY (last_movement_id)             REFERENCES document_movement (id)
 );
 
--- ============================================================
--- TABLE: document_version
--- ============================================================
 CREATE TABLE IF NOT EXISTS document_version (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     document_id INTEGER  NOT NULL,
@@ -93,10 +89,6 @@ CREATE TABLE IF NOT EXISTS document_version (
     UNIQUE (document_id, version_no)
 );
 
--- ============================================================
--- TABLE: tbl_reader_log
--- Hardware / audit event log (RFID reader events + system ops)
--- ============================================================
 CREATE TABLE IF NOT EXISTS tbl_reader_log (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     code         TEXT,
@@ -108,18 +100,19 @@ CREATE TABLE IF NOT EXISTS tbl_reader_log (
 -- ============================================================
 -- INDEXES
 -- ============================================================
+
 CREATE INDEX IF NOT EXISTS idx_document_department   ON document_holder  (department_id);
 CREATE INDEX IF NOT EXISTS idx_document_reference    ON document_holder  (reference_no);
 CREATE INDEX IF NOT EXISTS idx_document_holder_dept  ON document_holder  (current_holder_department_id);
 CREATE INDEX IF NOT EXISTS idx_version_document      ON document_version (document_id);
 CREATE INDEX IF NOT EXISTS idx_movement_document     ON document_movement(document_id);
 CREATE INDEX IF NOT EXISTS idx_reader_log_code       ON tbl_reader_log   (code, log_datetime);
+CREATE INDEX IF NOT EXISTS idx_user_role             ON app_user          (role_id);
 
 -- ============================================================
--- TRIGGER: trg_update_current_version_after_insert
--- Keeps document_holder.current_version_id pointing at the
--- latest version whenever a new document_version row is added.
+-- TRIGGERS
 -- ============================================================
+
 CREATE TRIGGER IF NOT EXISTS trg_update_current_version_after_insert
 AFTER INSERT ON document_version
 BEGIN
@@ -135,14 +128,6 @@ BEGIN
           );
 END;
 
--- ============================================================
--- TRIGGER: trg_update_holder_after_movement
--- Keeps document_holder denormalized columns in sync whenever
--- a document_movement row is inserted:
---   · current_holder_department_id → to_department_id
---   · current_holder_user_id       → moved_by
---   · last_movement_id             → NEW.id
--- ============================================================
 CREATE TRIGGER IF NOT EXISTS trg_update_holder_after_movement
 AFTER INSERT ON document_movement
 BEGIN
@@ -153,10 +138,6 @@ BEGIN
     WHERE  id = NEW.document_id;
 END;
 
--- ============================================================
--- TRIGGER: trg_log_version_insert
--- Audit trail: writes to tbl_reader_log on every new version.
--- ============================================================
 CREATE TRIGGER IF NOT EXISTS trg_log_version_insert
 AFTER INSERT ON document_version
 BEGIN
@@ -167,3 +148,29 @@ BEGIN
         'Added version ' || NEW.version_no || ' for doc_id=' || NEW.document_id
     );
 END;
+
+-- ============================================================
+-- SEED DATA
+-- ============================================================
+
+INSERT OR IGNORE INTO department (id, name) VALUES
+    (1, 'Admin'),
+    (2, 'IT'),
+    (3, 'Finance'),
+    (4, 'HR');
+
+INSERT OR IGNORE INTO role (id, role_name) VALUES
+    (1, 'Admin'),
+    (2, 'Manager'),
+    (3, 'User');
+
+INSERT OR IGNORE INTO app_user (id, username, fullname, password, role_id, is_active, is_deleted)
+    VALUES (
+        1,
+        'admin',
+        'Administrator',
+        'pbkdf2_sha256$100000$19+l//396ke6UJFFxaC0uA==$pr0+rF+g8W/RIMm9ipFqQIGzNNNpeR/+taOTCs3UZ6M=',
+        1,
+        1,
+        0
+    );

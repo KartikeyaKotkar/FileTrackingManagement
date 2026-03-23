@@ -23,7 +23,7 @@
 
 Departments: Admin(1), IT(2), Finance(3), HR(4)
 Roles: Admin(1), Manager(2), User(3)
-Default user: admin / Admin@123 / role_id=1
+Default user: admin / configured seeded password hash / role_id=1
 
 ## Status Constraint
 

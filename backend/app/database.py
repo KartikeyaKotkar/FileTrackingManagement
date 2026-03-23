@@ -1,6 +1,5 @@
 import sqlite3
 from contextlib import contextmanager
-from pathlib import Path
 
 DB_PATH = "main.db"
 
@@ -18,13 +17,6 @@ def get_conn():
         yield conn
     finally:
         conn.close()
-
-
-# -----------------------------
-# Utility: Load SQL files
-# -----------------------------
-def load_query(path: str):
-    return Path(path).read_text()
 
 
 # -----------------------------
@@ -53,11 +45,17 @@ def get_user_by_login(login: str, password: str):
     Returns user dict (without password) or None.
     """
     from app.sql_loader import sql
+    from app.security import verify_password
 
-    return fetch_one(
+    user = fetch_one(
         sql.users.get_user_by_login,
-        (login, login, password),  # login passed twice: for username + email check
+        (login, login),  # login passed twice: for username + email check
     )
+    if not user or not verify_password(password, user.get("password")):
+        return None
+
+    user.pop("password", None)
+    return user
 
 
 # -----------------------------
@@ -65,6 +63,7 @@ def get_user_by_login(login: str, password: str):
 # -----------------------------
 def create_user(username, fullname, password, email, phone, role_id, created_by):
     from app.sql_loader import sql
+    from app.security import hash_password
 
     with get_conn() as conn:
         cur = conn.cursor()
@@ -74,7 +73,15 @@ def create_user(username, fullname, password, email, phone, role_id, created_by)
 
             cur.execute(
                 sql.users.create_user,
-                (username, fullname, password, email, phone, role_id, created_by),
+                (
+                    username,
+                    fullname,
+                    hash_password(password),
+                    email,
+                    phone,
+                    role_id,
+                    created_by,
+                ),
             )
 
             user_id = cur.lastrowid
@@ -87,20 +94,10 @@ def create_user(username, fullname, password, email, phone, role_id, created_by)
 
 
 # -----------------------------
-# Create document + first version
+# Create document
 # -----------------------------
-def create_document_with_version(
-    reference_no, title, department_id, created_by, file_info
-):
-    """
-    file_info = {
-        "version_no": int,
-        "file_name": str,
-        "file_path": str,
-        "file_hash": str,
-        "file_size": int
-    }
-    """
+def create_document(reference_no, title, department_id, created_by):
+    from app.sql_loader import sql
 
     with get_conn() as conn:
         cur = conn.cursor()
@@ -109,35 +106,12 @@ def create_document_with_version(
             cur.execute("BEGIN")
 
             cur.execute(
-                """
-                INSERT INTO document_holder
-                (reference_no, title, department_id, created_by)
-                VALUES (?, ?, ?, ?)
-                """,
+                sql.documents.create_document,
                 (reference_no, title, department_id, created_by),
             )
 
-            doc_id = cur.lastrowid
-
-            cur.execute(
-                """
-                INSERT INTO document_version
-                (document_id, version_no, file_name, file_path, file_hash, file_size, created_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    doc_id,
-                    file_info["version_no"],
-                    file_info["file_name"],
-                    file_info["file_path"],
-                    file_info.get("file_hash"),
-                    file_info.get("file_size"),
-                    created_by,
-                ),
-            )
-
             cur.execute("COMMIT")
-            return doc_id
+            return cur.lastrowid
 
         except Exception:
             cur.execute("ROLLBACK")
@@ -150,6 +124,7 @@ def create_document_with_version(
 def add_version(
     document_id, version_no, file_name, file_path, file_hash, file_size, created_by
 ):
+    from app.sql_loader import sql
 
     with get_conn() as conn:
         cur = conn.cursor()
@@ -158,11 +133,7 @@ def add_version(
             cur.execute("BEGIN")
 
             cur.execute(
-                """
-                INSERT INTO document_version
-                (document_id, version_no, file_name, file_path, file_hash, file_size, created_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
+                sql.versions.create_version,
                 (
                     document_id,
                     version_no,
@@ -188,6 +159,7 @@ def add_version(
 def move_document(
     document_id, from_dept, to_dept, movement_type, approved_by, moved_by, remarks
 ):
+    from app.sql_loader import sql
 
     with get_conn() as conn:
         cur = conn.cursor()
@@ -196,12 +168,7 @@ def move_document(
             cur.execute("BEGIN")
 
             cur.execute(
-                """
-                INSERT INTO document_movement
-                (document_id, from_department_id, to_department_id, movement_type,
-                approved_by, moved_by, remarks)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
+                sql.movement.move_document,
                 (
                     document_id,
                     from_dept,
@@ -214,10 +181,7 @@ def move_document(
             )
 
             cur.execute(
-                """
-                INSERT INTO tbl_reader_log (code, log_status, log_message)
-                VALUES (?, ?, ?)
-                """,
+                sql.logs.insert_log,
                 (
                     "DOC_TRANSFER",
                     "SUCCESS",
@@ -227,6 +191,23 @@ def move_document(
 
             cur.execute("COMMIT")
 
+        except Exception:
+            cur.execute("ROLLBACK")
+            raise
+
+
+def update_document_status(document_id, status):
+    from app.sql_loader import sql
+
+    with get_conn() as conn:
+        cur = conn.cursor()
+
+        try:
+            cur.execute("BEGIN")
+            cur.execute(sql.documents.update_document_status, (status, document_id))
+            updated = cur.rowcount
+            cur.execute("COMMIT")
+            return updated
         except Exception:
             cur.execute("ROLLBACK")
             raise

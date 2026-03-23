@@ -119,7 +119,10 @@ SET
 -- ------------------------------------------------------------
 
 UPDATE app_user
-SET    password = 'Admin@123', role_id = 1, is_active = 1, is_deleted = 0
+SET    password = 'pbkdf2_sha256$100000$19+l//396ke6UJFFxaC0uA==$pr0+rF+g8W/RIMm9ipFqQIGzNNNpeR/+taOTCs3UZ6M=',
+       role_id = 1,
+       is_active = 1,
+       is_deleted = 0
 WHERE  username = 'admin';
 
 -- ------------------------------------------------------------
