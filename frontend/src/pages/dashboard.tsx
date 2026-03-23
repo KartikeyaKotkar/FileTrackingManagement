@@ -26,6 +26,7 @@ export default function Dashboard() {
   const [newUser, setNewUser] = useState({ username: "", password: "", role: "user" });
   const [newDept, setNewDept] = useState({ name: "", description: "" });
   const [createLoading, setCreateLoading] = useState(false);
+  const [editingDeptId, setEditingDeptId] = useState<number | null>(null);
 
   // Admin explicit states
   const [adminStats, setAdminStats] = useState<any>(null);
@@ -129,20 +130,51 @@ export default function Dashboard() {
     
     setCreateLoading(true);
     try {
-      await api.post("/departments/", { name: newDept.name, description: newDept.description });
+      if (editingDeptId) {
+        await api.put(`/departments/${editingDeptId}`, { name: newDept.name, description: newDept.description });
+        alert("Department updated successfully!");
+      } else {
+        await api.post("/departments/", { name: newDept.name, description: newDept.description });
+        alert("Department created successfully!");
+      }
       setCreateDeptModal(false);
+      setEditingDeptId(null);
       setNewDept({ name: "", description: "" });
-      alert("Department created successfully!");
+      
       if (currentPath === "/departments-view") {
           const deptsRes = await api.get("/departments/");
           setDepartmentsList(deptsRes.data);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Failed to create department. Please try again.");
+      alert(err.response?.data?.detail || "Failed to save department. Please try again.");
     } finally {
       setCreateLoading(false);
     }
+  };
+
+  const handleEditDeptClick = (dep: any) => {
+    setEditingDeptId(dep.id);
+    setNewDept({ name: dep.name, description: dep.description || "" });
+    setCreateDeptModal(true);
+  };
+
+  const handleDeleteDept = async (id: number) => {
+    if (!window.confirm("Are you sure you want to delete this department?")) return;
+    try {
+      await api.delete(`/departments/${id}`);
+      const deptsRes = await api.get("/departments/");
+      setDepartmentsList(deptsRes.data);
+    } catch (err: any) {
+      console.error(err);
+      alert(err.response?.data?.detail || "Failed to delete department.");
+    }
+  };
+
+  const handleCloseDeptModal = () => {
+    setCreateDeptModal(false);
+    setEditingDeptId(null);
+    setNewDept({ name: "", description: "" });
   };
 
   const renderPieChart = () => {
@@ -412,7 +444,11 @@ export default function Dashboard() {
                 </div>
                 <div className="flex gap-3">
                   <button 
-                    onClick={() => setCreateDeptModal(true)}
+                    onClick={() => {
+                      setEditingDeptId(null);
+                      setNewDept({ name: "", description: "" });
+                      setCreateDeptModal(true);
+                    }}
                     className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors"
                   >
                     <Plus className="w-4 h-4" />
@@ -427,6 +463,7 @@ export default function Dashboard() {
                     <tr>
                       <th className="px-6 py-4">Name</th>
                       <th className="px-6 py-4">Description</th>
+                      <th className="px-6 py-4 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -434,11 +471,15 @@ export default function Dashboard() {
                       <tr key={dep.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 font-medium text-gray-900">{dep.name}</td>
                         <td className="px-6 py-4 text-gray-600">{dep.description || "No description"}</td>
+                        <td className="px-6 py-4 text-right">
+                          <button onClick={() => handleEditDeptClick(dep)} className="text-blue-600 hover:text-blue-800 font-medium mr-4">Edit</button>
+                          <button onClick={() => handleDeleteDept(dep.id)} className="text-red-600 hover:text-red-800 font-medium">Delete</button>
+                        </td>
                       </tr>
                     ))}
                     {departmentsList.length === 0 && (
                       <tr>
-                        <td colSpan={2} className="px-6 py-12 text-center text-gray-500">
+                        <td colSpan={3} className="px-6 py-12 text-center text-gray-500">
                           You haven't created any departments yet.
                         </td>
                       </tr>
@@ -525,8 +566,8 @@ export default function Dashboard() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 p-4">
           <div className="bg-white rounded-xl shadow-lg w-full max-w-md overflow-hidden relative">
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="font-semibold text-lg">Create Department</h3>
-              <button onClick={() => setCreateDeptModal(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5"/></button>
+              <h3 className="font-semibold text-lg">{editingDeptId ? "Edit Department" : "Create Department"}</h3>
+              <button onClick={handleCloseDeptModal} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5"/></button>
             </div>
             <form onSubmit={handleCreateDept} className="p-6 space-y-4">
               <div className="space-y-1">
@@ -542,8 +583,10 @@ export default function Dashboard() {
                 <input type="text" value={newDept.description} onChange={(e) => setNewDept({...newDept, description: e.target.value})} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Handles internal..." />
               </div>
               <div className="pt-4 flex justify-end gap-3">
-                <button type="button" onClick={() => setCreateDeptModal(false)} className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg">Cancel</button>
-                <button type="submit" disabled={createLoading} className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50">Create Department</button>
+                <button type="button" onClick={handleCloseDeptModal} className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg">Cancel</button>
+                <button type="submit" disabled={createLoading} className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50">
+                   {editingDeptId ? "Update Department" : "Create Department"}
+                </button>
               </div>
             </form>
           </div>
