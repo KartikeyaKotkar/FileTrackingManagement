@@ -7,7 +7,7 @@ export default function DocumentDetail() {
   const { id } = useParams();
   const [doc, setDoc] = useState<any>(null);
   const [versions, setVersions] = useState<any[]>([]);
-  const [movements, setMovements] = useState<any[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
 
@@ -17,14 +17,14 @@ export default function DocumentDetail() {
 
   const fetchData = async () => {
     try {
-      const [docRes, verRes, movRes] = await Promise.all([
+      const [docRes, verRes, evtRes] = await Promise.all([
         api.get(`/documents/${id}`),
         api.get(`/versions/${id}`),
-        api.get(`/movement/${id}`)
+        api.get(`/files/${id}/history`)
       ]);
       setDoc(docRes.data);
       setVersions(verRes.data);
-      setMovements(movRes.data);
+      setEvents(evtRes.data);
       if (verRes.data.length > 0) {
         setNewVersion(prev => ({...prev, version_no: verRes.data[verRes.data.length - 1].version_no + 1}));
       }
@@ -151,19 +151,24 @@ export default function DocumentDetail() {
           </div>
 
           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-            <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><History className="w-5 h-5"/> Movement History</h2>
-            {movements.length > 0 ? (
+            <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><History className="w-5 h-5"/> Event History</h2>
+            {events.length > 0 ? (
               <div className="relative border-l border-gray-200 ml-3 space-y-4">
-                {movements.map((m: any) => (
-                  <div key={m.id} className="pl-4 relative">
+                {events.map((e: any, idx: number) => (
+                  <div key={idx} className="pl-4 relative">
                     <div className="absolute w-2 h-2 bg-blue-500 rounded-full -left-[4.5px] top-1.5 ring-4 ring-white"></div>
-                    <p className="text-sm font-medium">Moved to Dept {m.to_department_id}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{m.remarks || "No remarks"} • {new Date(m.moved_at).toLocaleDateString()}</p>
+                    <p className="text-sm font-medium capitalize">Document {e.action}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      By {e.performed_by || "System"} 
+                      {e.action === "moved" && e.to_department && ` (${e.from_department || "?"} → ${e.to_department})`}
+                      <br/>
+                      {new Date(e.timestamp).toLocaleString()}
+                    </p>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-500">No movement history.</p>
+              <p className="text-sm text-gray-500">No event history.</p>
             )}
           </div>
         </div>
