@@ -5,9 +5,16 @@ from app.database import create_user as db_create_user, fetch_all, get_user_by_l
 from app.errors import raise_for_write_error
 from app.models.schemas import LoginRequest, UserCreate, UserUpdate
 from app.sql_loader import sql
-from app.deps import require_admin
+from pydantic import BaseModel
+from app.deps import require_admin, get_current_user_id
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
+
+try:
+    with get_conn() as conn:
+        conn.execute("ALTER TABLE app_user ADD COLUMN department_id INTEGER")
+except Exception:
+    pass
 
 # ----------------------------------------
 # POST /auth/login
@@ -48,8 +55,37 @@ def create_user(data: UserCreate, _ = Depends(require_admin)):
 # ----------------------------------------
 @router.get("/users")
 def list_users(_ = Depends(require_admin)):
-    return fetch_all(sql.users.list_users)
+    return fetch_all("""
+        SELECT u.id, u.username, u.fullname, u.email, u.role_id, 
+               u.department_id, d.name as department_name 
+        FROM app_user u 
+        LEFT JOIN department d ON u.department_id = d.id
+    """)
 
+class AssignDepartmentReq(BaseModel):
+    department_id: int
+
+# ----------------------------------------
+# PUT /auth/users/{user_id}/assign-department
+# PROTECTED — requires Admin
+# ----------------------------------------
+@router.put("/users/{user_id}/assign-department")
+def assign_user_department(user_id: int, req: AssignDepartmentReq, _ = Depends(require_admin), admin_id: int = Depends(get_current_user_id)):
+    with get_conn() as conn:
+        cur = conn.cursor()
+        
+        dept = fetch_one("SELECT created_by FROM department WHERE id = ?", (req.department_id,))
+        if not dept:
+            raise HTTPException(status_code=404, detail="Department not found")
+        if dept["created_by"] != admin_id:
+            raise HTTPException(status_code=403, detail="Not authorized to assign to this department")
+            
+        user = fetch_one("SELECT id FROM app_user WHERE id = ?", (user_id,))
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+            
+        cur.execute("UPDATE app_user SET department_id = ? WHERE id = ?", (req.department_id, user_id))
+        return {"status": "success", "user_id": user_id, "department_id": req.department_id}
 
 # ----------------------------------------
 # PUT /auth/users/{user_id}
