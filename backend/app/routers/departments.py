@@ -1,0 +1,39 @@
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from app.database import get_conn, fetch_all, fetch_one
+from app.deps import require_admin
+from app.models.schemas import DepartmentCreate, DepartmentUpdate
+
+router = APIRouter(prefix="/departments", tags=["Departments"])
+
+@router.get("/")
+def get_departments():
+    return fetch_all("SELECT * FROM department")
+
+@router.post("/")
+def create_department(data: DepartmentCreate, _ = Depends(require_admin)):
+    with get_conn() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute("INSERT INTO department (name) VALUES (?)", (data.name,))
+            return {"id": cur.lastrowid, "name": data.name}
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+@router.put("/{dept_id}")
+def update_department(dept_id: int, data: DepartmentUpdate, _ = Depends(require_admin)):
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("UPDATE department SET name = ? WHERE id = ?", (data.name, dept_id))
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Department not found")
+        return {"status": "updated"}
+
+@router.delete("/{dept_id}")
+def delete_department(dept_id: int, _ = Depends(require_admin)):
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM department WHERE id = ?", (dept_id,))
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Department not found")
+        return {"status": "deleted"}
