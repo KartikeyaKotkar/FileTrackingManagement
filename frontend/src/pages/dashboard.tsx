@@ -32,6 +32,11 @@ export default function Dashboard() {
   const [adminStats, setAdminStats] = useState<any>(null);
   const [adminLogs, setAdminLogs] = useState<any[]>([]);
   const [departmentsList, setDepartmentsList] = useState<any[]>([]);
+  const [usersList, setUsersList] = useState<any[]>([]);
+  
+  // Assignment state
+  const [assignDeptModal, setAssignDeptModal] = useState<number | null>(null);
+  const [selectedDeptId, setSelectedDeptId] = useState<number | "">("");
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -71,6 +76,15 @@ export default function Dashboard() {
           
           if (currentPath === "/departments-view") {
               const deptsRes = await api.get("/departments/");
+              setDepartmentsList(deptsRes.data);
+          }
+
+          if (currentPath === "/users-view") {
+              const [usersRes, deptsRes] = await Promise.all([
+                  api.get("/auth/users"),
+                  api.get("/departments/")
+              ]);
+              setUsersList(usersRes.data);
               setDepartmentsList(deptsRes.data);
           }
         } catch (err) {
@@ -177,6 +191,25 @@ export default function Dashboard() {
     setNewDept({ name: "", description: "" });
   };
 
+  const handleAssignSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assignDeptModal || !selectedDeptId) return;
+    setCreateLoading(true);
+    try {
+      await api.put(`/auth/users/${assignDeptModal}/assign-department`, { department_id: Number(selectedDeptId) });
+      alert("User assigned successfully!");
+      setAssignDeptModal(null);
+      setSelectedDeptId("");
+      const usersRes = await api.get("/auth/users");
+      setUsersList(usersRes.data);
+    } catch (err: any) {
+      console.error(err);
+      alert(err.response?.data?.detail || "Failed to assign user.");
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
   const renderPieChart = () => {
     if (!adminStats || !adminStats.movement_counts_by_action) return null;
     const total = adminStats.movement_counts_by_action.reduce((sum: number, a: any) => sum + a.count, 0) || 1;
@@ -218,7 +251,10 @@ export default function Dashboard() {
           <NavItem to="/dashboard" icon={<LayoutDashboard />} label={user?.role_id === 1 ? "Admin Dashboard" : "Dashboard"} active={currentPath === "/dashboard"} />
           <NavItem to="/documents" icon={<FileText />} label="Documents" active={currentPath === "/documents"} />
           {user?.role_id === 1 && (
+            <>
+             <NavItem to="/users-view" icon={<LayoutDashboard />} label="Users" active={currentPath === "/users-view"} />
              <NavItem to="/departments-view" icon={<LayoutDashboard />} label="Departments" active={currentPath === "/departments-view"} />
+            </>
           )}
           <NavItem to="/settings" icon={<Settings />} label="Settings" active={currentPath === "/settings"} />
         </nav>
@@ -490,6 +526,52 @@ export default function Dashboard() {
             </div>
           )}
 
+          {/* Users View Tab */}
+          {currentPath === "/users-view" && (
+            <div className="animate-in fade-in duration-300">
+              <div className="flex items-end justify-between mb-8">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Users</h2>
+                  <p className="text-gray-500 mt-1 text-sm">View all users and assign them to your departments.</p>
+                </div>
+              </div>
+              
+              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                <table className="w-full text-left text-sm whitespace-nowrap">
+                  <thead className="bg-gray-50 text-gray-500 border-b border-gray-200 font-medium">
+                    <tr>
+                      <th className="px-6 py-4">Username</th>
+                      <th className="px-6 py-4">Fullname</th>
+                      <th className="px-6 py-4">Role</th>
+                      <th className="px-6 py-4">Department</th>
+                      <th className="px-6 py-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {usersList.map((u: any) => (
+                      <tr key={u.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 font-medium text-gray-900">{u.username}</td>
+                        <td className="px-6 py-4 text-gray-600">{u.fullname}</td>
+                        <td className="px-6 py-4 text-gray-600 capitalize">{u.role_id === 1 ? 'admin' : 'user'}</td>
+                        <td className="px-6 py-4 text-gray-600">{u.department_name || "Unassigned"}</td>
+                        <td className="px-6 py-4 text-right">
+                          <button onClick={() => setAssignDeptModal(u.id)} className="text-blue-600 hover:text-blue-800 font-medium">Assign Department</button>
+                        </td>
+                      </tr>
+                    ))}
+                    {usersList.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                          No users found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
         </div>
       </main>
 
@@ -586,6 +668,36 @@ export default function Dashboard() {
                 <button type="button" onClick={handleCloseDeptModal} className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg">Cancel</button>
                 <button type="submit" disabled={createLoading} className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50">
                    {editingDeptId ? "Update Department" : "Create Department"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Assign User Modal */}
+      {assignDeptModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 p-4">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-md overflow-hidden relative">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-semibold text-lg">Assign Department</h3>
+              <button onClick={() => setAssignDeptModal(null)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5"/></button>
+            </div>
+            <form onSubmit={handleAssignSubmit} className="p-6 space-y-4">
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">Select Department</label>
+                <select required value={selectedDeptId} onChange={(e) => setSelectedDeptId(Number(e.target.value))} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500">
+                  <option value="" disabled>Select a department</option>
+                  {departmentsList.map(d => (
+                     <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+                {departmentsList.length === 0 && <p className="text-xs text-red-500 mt-2">You haven't created any departments yet.</p>}
+              </div>
+              <div className="pt-4 flex justify-end gap-3">
+                <button type="button" onClick={() => setAssignDeptModal(null)} className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg">Cancel</button>
+                <button type="submit" disabled={createLoading || !selectedDeptId} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50">
+                   Confirm Assignment
                 </button>
               </div>
             </form>
