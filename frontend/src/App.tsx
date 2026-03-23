@@ -13,6 +13,7 @@ function App() {
         <Route path="/documents" element={<Dashboard />} />
         <Route path="/settings" element={<Dashboard />} />
         <Route path="/departments-view" element={<Dashboard />} />
+        <Route path="/users-view" element={<Dashboard />} />
         <Route path="/documents/:id" element={<DocumentDetail />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
