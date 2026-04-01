@@ -1,4 +1,4 @@
-# File Tracking System — Frontend Integration Guide
+# File Tracking System
 
 ## 🐳 Running Universally via Docker
 
