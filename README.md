@@ -1,5 +1,28 @@
 # File Tracking System — Frontend Integration Guide
 
+## 🐳 Running Universally via Docker
+
+The easiest way to clone and run this project without setting up PostgreSQL, Python, or Node on your local machine is by using **Docker**.
+
+### Prerequisites
+- [Docker](https://docs.docker.com/get-docker/)
+- [Docker Compose](https://docs.docker.com/compose/install/)
+
+### Steps to Run
+1. Clone the repository and navigate into the project directory.
+2. Run the following command:
+   ```bash
+   docker-compose up --build
+   ```
+3. The services will be available at:
+   - **Frontend**: `http://localhost:5173`
+   - **Backend API**: `http://localhost:8000`
+   - **Swagger Docs**: `http://localhost:8000/docs`
+
+> The PostgreSQL database container exposes port `5432` and will **automatically seed** all base tables directly from the `./SQL/schema` directory on its very first run! No manual DB setup required.
+
+---
+
 ## Overview
 
 This backend is built using FastAPI and provides APIs for:
