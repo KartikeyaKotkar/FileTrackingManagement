@@ -1,0 +1,13 @@
+department
+store
+
+loginuser
+userinfo id username department assigned designation
+
+
+login time
+end time
+
+add store as a department
+
+when a user logs in, they have to need to have a login time and end time when they log out

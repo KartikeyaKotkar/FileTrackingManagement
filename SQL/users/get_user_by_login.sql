@@ -13,7 +13,7 @@ SELECT
     u.created_at
 FROM app_user u
 LEFT JOIN role r ON u.role_id = r.id
-WHERE (u.username = ? OR u.email = ?)
+WHERE (u.username = %s OR u.email = %s)
   AND u.is_active  = 1
   AND u.is_deleted = 0
 LIMIT 1;

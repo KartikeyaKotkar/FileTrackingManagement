@@ -1,3 +1,3 @@
 UPDATE document_holder
-SET status = ?
-WHERE id = ?;
+SET status = %s
+WHERE id = %s;

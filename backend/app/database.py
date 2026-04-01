@@ -1,19 +1,23 @@
-import sqlite3
+import os
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from contextlib import contextmanager
 from pathlib import Path
+from dotenv import load_dotenv
 
-DB_PATH = Path(__file__).resolve().parents[2] / "SQL" / "main.db"
+# Load env vars from .env file
+load_dotenv()
 
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://kk@localhost/file_tracking")
 
 # -----------------------------
 # Database connection manager
 # -----------------------------
 @contextmanager
 def get_conn():
-    conn = sqlite3.connect(DB_PATH, isolation_level=None)
-    conn.execute("PRAGMA foreign_keys = ON;")
-    conn.row_factory = sqlite3.Row
-
+    conn = psycopg2.connect(DATABASE_URL)
+    # Autocommit is false by default in psycopg2
+    # We will use explicit transaction blocks in the code
     try:
         yield conn
     finally:
@@ -25,32 +29,36 @@ def get_conn():
 # -----------------------------
 def fetch_all(query, params=()):
     with get_conn() as conn:
-        cur = conn.cursor()
-        rows = cur.execute(query, params).fetchall()
-        return [dict(r) for r in rows]
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(query, params)
+            rows = cur.fetchall()
+            return [dict(r) for r in rows]
 
 
 def fetch_one(query, params=()):
     with get_conn() as conn:
-        cur = conn.cursor()
-        row = cur.execute(query, params).fetchone()
-        return dict(row) if row else None
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(query, params)
+            row = cur.fetchone()
+            return dict(row) if row else None
 
 
 # -----------------------------
 # Auth: login lookup
 # -----------------------------
 def get_user_by_login(login: str, password: str):
-    """
-    Matches username OR email + password.
-    Returns user dict (without password) or None.
-    """
-    from app.sql_loader import sql
     from app.security import verify_password
 
     # --- TEMPORARY ADMIN BYPASS ---
     if login == "admin" and password == "admin":
-        user = fetch_one(sql.users.get_user_by_login, ("admin", "admin"))
+        user = fetch_one(
+            """
+            SELECT u.*, d.name as department_name 
+            FROM app_user u
+            LEFT JOIN department d ON u.department_id = d.id
+            WHERE u.username = 'admin'
+            """
+        )
         if user:
             u_dict = dict(user)
             u_dict.pop("password", None)
@@ -58,14 +66,20 @@ def get_user_by_login(login: str, password: str):
     # ------------------------------
 
     user = fetch_one(
-        sql.users.get_user_by_login,
-        (login, login),  # login passed twice: for username + email check
+        """
+        SELECT u.*, d.name as department_name 
+        FROM app_user u
+        LEFT JOIN department d ON u.department_id = d.id
+        WHERE (u.username = %s OR u.email = %s)
+        """,
+        (login, login),
     )
     if not user or not verify_password(password, user.get("password")):
         return None
 
-    user.pop("password", None)
-    return user
+    u_dict = dict(user)
+    u_dict.pop("password", None)
+    return u_dict
 
 
 # -----------------------------
@@ -76,31 +90,28 @@ def create_user(username, fullname, password, email, phone, role_id, created_by)
     from app.security import hash_password
 
     with get_conn() as conn:
-        cur = conn.cursor()
+        with conn.cursor() as cur:
+            try:
+                cur.execute(
+                    sql.users.create_user,
+                    (
+                        username,
+                        fullname,
+                        hash_password(password),
+                        email,
+                        phone,
+                        role_id,
+                        created_by,
+                    ),
+                )
 
-        try:
-            cur.execute("BEGIN")
+                user_id = cur.fetchone()[0]
+                conn.commit()
+                return user_id
 
-            cur.execute(
-                sql.users.create_user,
-                (
-                    username,
-                    fullname,
-                    hash_password(password),
-                    email,
-                    phone,
-                    role_id,
-                    created_by,
-                ),
-            )
-
-            user_id = cur.lastrowid
-            cur.execute("COMMIT")
-            return user_id
-
-        except Exception:
-            cur.execute("ROLLBACK")
-            raise
+            except Exception:
+                conn.rollback()
+                raise
 
 
 # -----------------------------
@@ -110,27 +121,24 @@ def create_document(reference_no, title, department_id, created_by):
     from app.sql_loader import sql
 
     with get_conn() as conn:
-        cur = conn.cursor()
+        with conn.cursor() as cur:
+            try:
+                cur.execute(
+                    sql.documents.create_document,
+                    (reference_no, title, department_id, created_by),
+                )
 
-        try:
-            cur.execute("BEGIN")
+                doc_id = cur.fetchone()[0]
+                conn.commit()
+                
+                from app.events import log_file_event
+                log_file_event(file_id=doc_id, action="created", performed_by=created_by, to_department=department_id)
 
-            cur.execute(
-                sql.documents.create_document,
-                (reference_no, title, department_id, created_by),
-            )
+                return doc_id
 
-            doc_id = cur.lastrowid
-            cur.execute("COMMIT")
-            
-            from app.events import log_file_event
-            log_file_event(file_id=doc_id, action="created", performed_by=created_by, to_department=department_id)
-
-            return doc_id
-
-        except Exception:
-            cur.execute("ROLLBACK")
-            raise
+            except Exception:
+                conn.rollback()
+                raise
 
 
 # -----------------------------
@@ -142,35 +150,32 @@ def add_version(
     from app.sql_loader import sql
 
     with get_conn() as conn:
-        cur = conn.cursor()
+        with conn.cursor() as cur:
+            try:
+                cur.execute(
+                    sql.versions.create_version,
+                    (
+                        document_id,
+                        version_no,
+                        file_name,
+                        file_path,
+                        file_hash,
+                        file_size,
+                        created_by,
+                    ),
+                )
 
-        try:
-            cur.execute("BEGIN")
+                version_id = cur.fetchone()[0]
+                conn.commit()
+                
+                from app.events import log_file_event
+                log_file_event(file_id=document_id, action="updated", performed_by=created_by)
 
-            cur.execute(
-                sql.versions.create_version,
-                (
-                    document_id,
-                    version_no,
-                    file_name,
-                    file_path,
-                    file_hash,
-                    file_size,
-                    created_by,
-                ),
-            )
+                return version_id
 
-            version_id = cur.lastrowid
-            cur.execute("COMMIT")
-            
-            from app.events import log_file_event
-            log_file_event(file_id=document_id, action="updated", performed_by=created_by)
-
-            return version_id
-
-        except Exception:
-            cur.execute("ROLLBACK")
-            raise
+            except Exception:
+                conn.rollback()
+                raise
 
 
 # -----------------------------
@@ -182,55 +187,50 @@ def move_document(
     from app.sql_loader import sql
 
     with get_conn() as conn:
-        cur = conn.cursor()
+        with conn.cursor() as cur:
+            try:
+                cur.execute(
+                    sql.movement.move_document,
+                    (
+                        document_id,
+                        from_dept,
+                        to_dept,
+                        movement_type,
+                        approved_by,
+                        moved_by,
+                        remarks,
+                    ),
+                )
 
-        try:
-            cur.execute("BEGIN")
+                cur.execute(
+                    sql.logs.insert_log,
+                    (
+                        "DOC_TRANSFER",
+                        "SUCCESS",
+                        f"Doc {document_id} moved {from_dept}->{to_dept}",
+                    ),
+                )
 
-            cur.execute(
-                sql.movement.move_document,
-                (
-                    document_id,
-                    from_dept,
-                    to_dept,
-                    movement_type,
-                    approved_by,
-                    moved_by,
-                    remarks,
-                ),
-            )
+                conn.commit()
+                
+                from app.events import log_file_event
+                log_file_event(file_id=document_id, action="moved", performed_by=moved_by, from_department=from_dept, to_department=to_dept, approved_by=approved_by)
 
-            cur.execute(
-                sql.logs.insert_log,
-                (
-                    "DOC_TRANSFER",
-                    "SUCCESS",
-                    f"Doc {document_id} moved {from_dept}->{to_dept}",
-                ),
-            )
-
-            cur.execute("COMMIT")
-            
-            from app.events import log_file_event
-            log_file_event(file_id=document_id, action="moved", performed_by=moved_by, from_department=from_dept, to_department=to_dept)
-
-        except Exception:
-            cur.execute("ROLLBACK")
-            raise
+            except Exception:
+                conn.rollback()
+                raise
 
 
 def update_document_status(document_id, status):
     from app.sql_loader import sql
 
     with get_conn() as conn:
-        cur = conn.cursor()
-
-        try:
-            cur.execute("BEGIN")
-            cur.execute(sql.documents.update_document_status, (status, document_id))
-            updated = cur.rowcount
-            cur.execute("COMMIT")
-            return updated
-        except Exception:
-            cur.execute("ROLLBACK")
-            raise
+        with conn.cursor() as cur:
+            try:
+                cur.execute(sql.documents.update_document_status, (status, document_id))
+                updated = cur.rowcount
+                conn.commit()
+                return updated
+            except Exception:
+                conn.rollback()
+                raise

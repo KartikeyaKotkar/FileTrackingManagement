@@ -8,23 +8,32 @@ export default function DocumentDetail() {
   const [doc, setDoc] = useState<any>(null);
   const [versions, setVersions] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
+  const [transferStatus, setTransferStatus] = useState<any>(null);
+  const [departmentsList, setDepartmentsList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const [usersList, setUsersList] = useState<any[]>([]);
 
   // Forms
   const [newVersion, setNewVersion] = useState({ version_no: 1, file_name: "", file_path: "" });
-  const [newMovement, setNewMovement] = useState({ to_dept: 1, remarks: "" });
+  const [newMovement, setNewMovement] = useState({ to_dept: "", to_user_id: "" });
 
   const fetchData = async () => {
     try {
-      const [docRes, verRes, evtRes] = await Promise.all([
+      const [docRes, verRes, evtRes, trfRes, depRes, userRes] = await Promise.all([
         api.get(`/documents/${id}`),
         api.get(`/versions/${id}`),
-        api.get(`/files/${id}/history`)
+        api.get(`/files/${id}/history`),
+        api.get(`/files/${id}/transfer-status`),
+        api.get(`/departments/?all=true`),
+        api.get(`/auth/users`)
       ]);
       setDoc(docRes.data);
       setVersions(verRes.data);
       setEvents(evtRes.data);
+      setTransferStatus(trfRes.data);
+      setDepartmentsList(depRes.data);
+      setUsersList(userRes.data);
       if (verRes.data.length > 0) {
         setNewVersion(prev => ({...prev, version_no: verRes.data[verRes.data.length - 1].version_no + 1}));
       }
@@ -59,23 +68,18 @@ export default function DocumentDetail() {
     }
   };
 
-  const handleMove = async (e: React.FormEvent) => {
+  const handleTransferRequest = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newMovement.to_dept) return;
     try {
-      await api.post("/movement/", {
-        document_id: Number(id),
-        from_dept: doc?.department_id || 1, // simplified assumption
-        to_dept: Number(newMovement.to_dept),
-        movement_type: "Transfer",
-        approved_by: user?.id || 1,
-        moved_by: user?.id || 1,
-        remarks: newMovement.remarks
+      await api.post(`/files/${id}/request-transfer`, { 
+        to_department_id: Number(newMovement.to_dept),
+        to_user_id: newMovement.to_user_id ? Number(newMovement.to_user_id) : null
       });
-      setNewMovement({to_dept: 1, remarks: ""});
       fetchData();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Failed to move document");
+      alert(err.response?.data?.detail || "Failed to request transfer");
     }
   };
 
@@ -96,7 +100,7 @@ export default function DocumentDetail() {
             <h1 className="text-2xl font-bold text-gray-900">{doc.title}</h1>
             <p className="text-gray-500 font-mono text-sm mt-1">{doc.reference_no}</p>
             <div className="mt-4 flex gap-4">
-              <span className="bg-blue-50 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-full">Dept: {doc.department_id}</span>
+              <span className="bg-blue-50 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-full">Dept: {doc.department?.name || doc.department_id || "Unassigned"}</span>
               <span className="bg-green-50 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full">{doc.status}</span>
             </div>
           </div>
@@ -131,23 +135,43 @@ export default function DocumentDetail() {
         {/* Right Column: Movement History */}
         <div className="space-y-8">
           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-            <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><Send className="w-5 h-5"/> Transfer Document</h2>
-            <form onSubmit={handleMove} className="space-y-3">
-              <div>
-                <label className="text-sm text-gray-600 mb-1 block">To Department</label>
-                <select value={newMovement.to_dept} onChange={e => setNewMovement({...newMovement, to_dept: Number(e.target.value)})} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500">
-                  <option value={1}>Admin</option>
-                  <option value={2}>IT</option>
-                  <option value={3}>Finance</option>
-                  <option value={4}>HR</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-sm text-gray-600 mb-1 block">Remarks</label>
-                <input type="text" value={newMovement.remarks} onChange={e => setNewMovement({...newMovement, remarks: e.target.value})} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500" placeholder="Transfer reason..." />
-              </div>
-              <button type="submit" className="w-full bg-blue-600 text-white rounded-md px-4 py-2 text-sm font-medium hover:bg-blue-700">Submit Transfer</button>
-            </form>
+            <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><Send className="w-5 h-5"/> Request Transfer</h2>
+            {transferStatus ? (
+               <div className="flex flex-col gap-3 text-sm font-medium p-6 bg-amber-50 rounded-xl border border-amber-200 text-amber-700 text-center items-center">
+                  <span className="text-3xl mb-1">⏳</span>
+                  <span className="bg-amber-100 px-3 py-1 rounded-full text-xs box-content border border-amber-200 shadow-sm">Pending Approval</span>
+                  <p className="text-amber-800 max-w-[200px]">Waiting for an admin to approve the transfer destination.</p>
+               </div>
+            ) : (
+               <form onSubmit={handleTransferRequest} className="space-y-4">
+                 <div>
+                   <label className="text-sm font-medium text-gray-700 mb-1.5 block">Transfer To Department</label>
+                   <select required value={newMovement.to_dept} onChange={e => setNewMovement({to_dept: e.target.value, to_user_id: ""})} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 bg-gray-50">
+                     <option value="" disabled>Select a destination</option>
+                     {departmentsList.map(dep => (
+                        <option key={dep.id} value={dep.id}>{dep.name}</option>
+                     ))}
+                   </select>
+                 </div>
+                 {newMovement.to_dept && (
+                 <div>
+                   <label className="text-sm font-medium text-gray-700 mb-1.5 block">Transfer To Person</label>
+                   <select value={newMovement.to_user_id} onChange={e => setNewMovement({...newMovement, to_user_id: e.target.value})} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 bg-gray-50">
+                     <option value="">Shared Inbox (Department)</option>
+                     {usersList.filter((u: any) => u.department_id === Number(newMovement.to_dept)).map((u: any) => (
+                        <option key={u.id} value={u.id}>{u.fullname || u.username}</option>
+                     ))}
+                   </select>
+                 </div>
+                 )}
+                 <button type="submit" disabled={user?.role_id !== 1 && user?.department_id !== doc?.department_id} className="w-full bg-blue-600 text-white rounded-md px-4 py-3 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm">
+                   Request Transfer
+                 </button>
+                 {user?.role_id !== 1 && user?.department_id !== doc?.department_id && (
+                     <p className="text-xs text-red-500 text-center">You must own this document to request a transfer.</p>
+                 )}
+               </form>
+            )}
           </div>
 
           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
@@ -161,6 +185,7 @@ export default function DocumentDetail() {
                     <p className="text-xs text-gray-500 mt-0.5">
                       By {e.performed_by || "System"} 
                       {e.action === "moved" && e.to_department && ` (${e.from_department || "?"} → ${e.to_department})`}
+                      {e.approved_by && ` (Approved by ${e.approved_by})`}
                       <br/>
                       {new Date(e.timestamp).toLocaleString()}
                     </p>

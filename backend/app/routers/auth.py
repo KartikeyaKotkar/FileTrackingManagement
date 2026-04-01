@@ -10,11 +10,7 @@ from app.deps import require_admin, get_current_user_id
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
-try:
-    with get_conn() as conn:
-        conn.execute("ALTER TABLE app_user ADD COLUMN department_id INTEGER")
-except Exception:
-    pass
+# Table schema should be handled by migration scripts, not inline here.
 
 # ----------------------------------------
 # POST /auth/login
@@ -54,7 +50,7 @@ def create_user(data: UserCreate, _ = Depends(require_admin)):
 # PROTECTED — requires Admin
 # ----------------------------------------
 @router.get("/users")
-def list_users(_ = Depends(require_admin)):
+def list_users():
     return fetch_all("""
         SELECT u.id, u.username, u.fullname, u.email, u.role_id, 
                u.department_id, d.name as department_name 
@@ -74,17 +70,18 @@ def assign_user_department(user_id: int, req: AssignDepartmentReq, _ = Depends(r
     with get_conn() as conn:
         cur = conn.cursor()
         
-        dept = fetch_one("SELECT created_by FROM department WHERE id = ?", (req.department_id,))
+        dept = fetch_one("SELECT created_by FROM department WHERE id = %s", (req.department_id,))
         if not dept:
             raise HTTPException(status_code=404, detail="Department not found")
         if dept["created_by"] != admin_id:
             raise HTTPException(status_code=403, detail="Not authorized to assign to this department")
             
-        user = fetch_one("SELECT id FROM app_user WHERE id = ?", (user_id,))
+        user = fetch_one("SELECT id FROM app_user WHERE id = %s", (user_id,))
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
             
-        cur.execute("UPDATE app_user SET department_id = ? WHERE id = ?", (req.department_id, user_id))
+        cur.execute("UPDATE app_user SET department_id = %s WHERE id = %s", (req.department_id, user_id))
+        conn.commit()
         return {"status": "success", "user_id": user_id, "department_id": req.department_id}
 
 # ----------------------------------------
@@ -102,12 +99,13 @@ def update_user(user_id: int, data: UserUpdate, _ = Depends(require_admin)):
         try:
             cur.execute("""
                 UPDATE app_user 
-                SET fullname = COALESCE(?, fullname),
-                    email = COALESCE(?, email),
-                    role_id = COALESCE(?, role_id),
-                    is_active = COALESCE(?, is_active)
-                WHERE id = ?
+                SET fullname = COALESCE(%s, fullname),
+                    email = COALESCE(%s, email),
+                    role_id = COALESCE(%s, role_id),
+                    is_active = COALESCE(%s, is_active)
+                WHERE id = %s
             """, (data.fullname, data.email, role_id, data.is_active, user_id))
+            conn.commit()
             if cur.rowcount == 0:
                 raise HTTPException(status_code=404, detail="User not found")
             return {"status": "updated"}
@@ -124,7 +122,8 @@ def delete_user(user_id: int, _ = Depends(require_admin)):
     with get_conn() as conn:
         cur = conn.cursor()
         # Soft delete logic
-        cur.execute("UPDATE app_user SET is_deleted = 1, is_active = 0 WHERE id = ?", (user_id,))
+        cur.execute("UPDATE app_user SET is_deleted = 1, is_active = 0 WHERE id = %s", (user_id,))
+        conn.commit()
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="User not found")
         return {"status": "deleted"}

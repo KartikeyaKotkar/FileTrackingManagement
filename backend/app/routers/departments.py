@@ -24,7 +24,7 @@ def get_current_user_role(x_user_role: str = Header(default="user")):
 @router.get("/")
 def get_departments(role: str = Depends(get_current_user_role), user_id: int = Depends(get_current_user_id)):
     if role == "admin":
-        return fetch_all("SELECT id, name, description, created_by FROM department WHERE created_by = ?", (user_id,))
+        return fetch_all("SELECT id, name, description, created_by FROM department WHERE created_by = %s", (user_id,))
     return []
 
 @router.post("/")
@@ -32,14 +32,14 @@ def create_department(data: DepartmentCreate, _ = Depends(require_admin), user_i
     with get_conn() as conn:
         cur = conn.cursor()
         try:
-            cur.execute("INSERT INTO department (name, description, created_by) VALUES (?, ?, ?)", (data.name, data.description, user_id))
+            cur.execute("INSERT INTO department (name, description, created_by) VALUES (%s, %s, %s)", (data.name, data.description, user_id))
             return {"id": cur.lastrowid, "name": data.name, "description": data.description, "created_by": user_id}
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
 
 @router.put("/{dept_id}")
 def update_department(dept_id: int, data: DepartmentUpdate, _ = Depends(require_admin), user_id: int = Depends(get_current_user_id)):
-    row = fetch_one("SELECT created_by FROM department WHERE id = ?", (dept_id,))
+    row = fetch_one("SELECT created_by FROM department WHERE id = %s", (dept_id,))
     if not row:
         raise HTTPException(status_code=404, detail="Department not found")
     if row["created_by"] != user_id:
@@ -47,12 +47,12 @@ def update_department(dept_id: int, data: DepartmentUpdate, _ = Depends(require_
 
     with get_conn() as conn:
         cur = conn.cursor()
-        cur.execute("UPDATE department SET name = ?, description = ? WHERE id = ?", (data.name, data.description, dept_id))
+        cur.execute("UPDATE department SET name = %s, description = %s WHERE id = %s", (data.name, data.description, dept_id))
         return {"id": dept_id, "name": data.name, "description": data.description, "created_by": user_id}
 
 @router.delete("/{dept_id}")
 def delete_department(dept_id: int, _ = Depends(require_admin), user_id: int = Depends(get_current_user_id)):
-    row = fetch_one("SELECT created_by FROM department WHERE id = ?", (dept_id,))
+    row = fetch_one("SELECT created_by FROM department WHERE id = %s", (dept_id,))
     if not row:
         raise HTTPException(status_code=404, detail="Department not found")
     if row["created_by"] != user_id:
@@ -60,5 +60,5 @@ def delete_department(dept_id: int, _ = Depends(require_admin), user_id: int = D
 
     with get_conn() as conn:
         cur = conn.cursor()
-        cur.execute("DELETE FROM department WHERE id = ?", (dept_id,))
+        cur.execute("DELETE FROM department WHERE id = %s", (dept_id,))
         return {"status": "deleted"}

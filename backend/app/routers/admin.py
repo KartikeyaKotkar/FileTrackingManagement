@@ -11,11 +11,15 @@ def get_admin_logs(_=Depends(require_admin)):
                d1.name as from_department, 
                d2.name as to_department, 
                u.username as performed_by, 
+               a.username as approved_by,
+               dh.title as file_name,
                e.timestamp
         FROM file_event e
         LEFT JOIN department d1 ON e.from_department = d1.id
         LEFT JOIN department d2 ON e.to_department = d2.id
         LEFT JOIN app_user u ON e.performed_by = u.id
+        LEFT JOIN app_user a ON e.approved_by = a.id
+        LEFT JOIN document_holder dh ON e.file_id = dh.id
         ORDER BY e.timestamp DESC
         LIMIT 50
     """)
@@ -28,7 +32,7 @@ def get_admin_dashboard(_=Depends(require_admin)):
         FROM file_event e
         JOIN department d ON e.to_department = d.id
         WHERE e.to_department IS NOT NULL
-        GROUP BY e.to_department
+        GROUP BY d.name
     """)
     return {
         "movement_counts_by_action": actions,

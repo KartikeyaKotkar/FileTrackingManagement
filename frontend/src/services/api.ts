@@ -13,6 +13,7 @@ api.interceptors.request.use((config) => {
     const user = JSON.parse(userStr);
     config.headers["X-User-Role"] = user.role_id === 1 ? "admin" : "user";
     config.headers["X-User-Id"] = user.id.toString();
+    config.headers["X-User-Dept-Id"] = user.department_id ? user.department_id.toString() : "0";
   }
   return config;
 });

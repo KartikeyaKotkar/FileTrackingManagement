@@ -9,5 +9,5 @@ LEFT JOIN department fd ON m.from_department_id = fd.id
 LEFT JOIN department td ON m.to_department_id = td.id
 LEFT JOIN app_user approver ON m.approved_by = approver.id
 LEFT JOIN app_user mover ON m.moved_by = mover.id
-WHERE m.document_id = ?
+WHERE m.document_id = %s
 ORDER BY m.moved_at DESC;

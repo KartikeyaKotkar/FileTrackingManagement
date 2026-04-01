@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../services/api";
-import { FileText, LogOut, LayoutDashboard, Settings, Search, RefreshCw, Plus, X } from "lucide-react";
+import { FileText, LogOut, LayoutDashboard, Settings, Search, RefreshCw, Plus, X, Send } from "lucide-react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 
 interface Document {
@@ -8,6 +8,7 @@ interface Document {
   reference_no: string;
   title: string;
   department_id: number;
+  department?: { id: number; name: string };
   created_by: number;
   status: string;
   created_at: string;
@@ -33,6 +34,7 @@ export default function Dashboard() {
   const [adminLogs, setAdminLogs] = useState<any[]>([]);
   const [departmentsList, setDepartmentsList] = useState<any[]>([]);
   const [usersList, setUsersList] = useState<any[]>([]);
+  const [pendingTransfers, setPendingTransfers] = useState<any[]>([]);
   
   // Assignment state
   const [assignDeptModal, setAssignDeptModal] = useState<number | null>(null);
@@ -54,6 +56,17 @@ export default function Dashboard() {
     }
   };
 
+  const fetchUserDepartment = async () => {
+    try {
+      const res = await api.get("/departments/");
+      if (res.data && res.data.length > 0) {
+        setDepartmentsList(res.data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     const userData = localStorage.getItem("user");
     if (!userData) {
@@ -63,16 +76,19 @@ export default function Dashboard() {
     const parsedUser = JSON.parse(userData);
     setUser(parsedUser);
     fetchDocs();
+    fetchUserDepartment();
 
     if (parsedUser.role_id === 1) {
       const fetchAdminData = async () => {
         try {
-          const [statsRes, logsRes] = await Promise.all([
+          const [statsRes, logsRes, transfersRes] = await Promise.all([
             api.get("/admin/dashboard"),
-            api.get("/admin/logs")
+            api.get("/admin/logs"),
+            api.get("/transfer/pending")
           ]);
           setAdminStats(statsRes.data);
           setAdminLogs(logsRes.data);
+          setPendingTransfers(transfersRes.data);
           
           if (currentPath === "/departments-view") {
               const deptsRes = await api.get("/departments/");
@@ -92,12 +108,32 @@ export default function Dashboard() {
         }
       };
       fetchAdminData();
+    } else {
+      const fetchUserData = async () => {
+        try {
+          const logsRes = await api.get("/files/department-logs");
+          setAdminLogs(logsRes.data);
+        } catch (err) {
+          console.error(err);
+        }
+      };
+      fetchUserData();
     }
-  }, [navigate]);
+  }, [navigate, currentPath]);
 
   const handleLogout = () => {
     localStorage.removeItem("user");
     navigate("/login");
+  };
+
+  const handleStatusChange = async (id: number, newStatus: string) => {
+    try {
+      await api.patch(`/documents/${id}/status`, { status: newStatus });
+      fetchDocs();
+    } catch (err: any) {
+      console.error(err);
+      alert(err.response?.data?.detail || "Failed to update status.");
+    }
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -254,6 +290,7 @@ export default function Dashboard() {
             <>
              <NavItem to="/users-view" icon={<LayoutDashboard />} label="Users" active={currentPath === "/users-view"} />
              <NavItem to="/departments-view" icon={<LayoutDashboard />} label="Departments" active={currentPath === "/departments-view"} />
+             <NavItem to="/transfers-view" icon={<Send />} label="Pending Transfers" active={currentPath === "/transfers-view"} />
             </>
           )}
           <NavItem to="/settings" icon={<Settings />} label="Settings" active={currentPath === "/settings"} />
@@ -332,6 +369,7 @@ export default function Dashboard() {
                               <th className="px-6 py-3">Action</th>
                               <th className="px-6 py-3">User</th>
                               <th className="px-6 py-3">File ID</th>
+                              <th className="px-6 py-3">Approved By</th>
                               <th className="px-6 py-3">Details</th>
                             </tr>
                           </thead>
@@ -341,9 +379,18 @@ export default function Dashboard() {
                                 <td className="px-6 py-3 text-xs text-gray-500 whitespace-nowrap">{new Date(log.timestamp).toLocaleString()}</td>
                                 <td className="px-6 py-3 font-medium capitalize text-gray-900">{log.action}</td>
                                 <td className="px-6 py-3 text-gray-600">{log.performed_by || 'System'}</td>
-                                <td className="px-6 py-3 font-mono text-gray-500 text-xs">#{log.file_id}</td>
+                                <td className="px-6 py-3 font-mono text-gray-500 text-xs">
+                                  #{log.file_id} {log.file_name ? `- ${log.file_name}` : ''}
+                                </td>
                                 <td className="px-6 py-3 text-gray-600">
-                                  {log.action === "moved" ? `${log.from_department || '?'} → ${log.to_department}` : '-'}
+                                  {log.approved_by || '-'}
+                                </td>
+                                <td className="px-6 py-3 text-gray-600">
+                                  {log.action === "moved" 
+                                    ? `${log.from_department || '?'} → ${log.to_department}` 
+                                    : log.action === "created" 
+                                      ? `Created document: ${log.file_name || 'Unknown'}`
+                                      : '-'}
                                 </td>
                               </tr>
                             ))}
@@ -362,6 +409,49 @@ export default function Dashboard() {
                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col">
                      <h3 className="text-gray-500 text-sm font-medium mb-2">Your Role</h3>
                      <span className="text-lg font-bold text-blue-600">{user?.role_id === 1 ? "Administrator" : "Standard User"}</span>
+                   </div>
+
+                   <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden md:col-span-2 lg:col-span-3">
+                     <div className="p-6 border-b border-gray-100">
+                        <h3 className="text-lg font-bold text-gray-900">Recent Department Activity</h3>
+                     </div>
+                     <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-gray-50 text-gray-500 font-medium">
+                            <tr>
+                              <th className="px-6 py-3 whitespace-nowrap">Time</th>
+                              <th className="px-6 py-3">Action</th>
+                              <th className="px-6 py-3">User</th>
+                              <th className="px-6 py-3">File ID</th>
+                              <th className="px-6 py-3">Approved By</th>
+                              <th className="px-6 py-3">Details</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {adminLogs.map((log: any, i: number) => (
+                              <tr key={i} className="hover:bg-gray-50 transition-colors">
+                                <td className="px-6 py-3 text-xs text-gray-500 whitespace-nowrap">{new Date(log.timestamp).toLocaleString()}</td>
+                                <td className="px-6 py-3 font-medium capitalize text-gray-900">{log.action}</td>
+                                <td className="px-6 py-3 text-gray-600">{log.performed_by || 'System'}</td>
+                                <td className="px-6 py-3 font-mono text-gray-500 text-xs">
+                                  #{log.file_id} {log.file_name ? `- ${log.file_name}` : ''}
+                                </td>
+                                <td className="px-6 py-3 text-gray-600">
+                                  {log.approved_by || '-'}
+                                </td>
+                                <td className="px-6 py-3 text-gray-600">
+                                  {log.action === "moved" 
+                                    ? `${log.from_department || '?'} → ${log.to_department}` 
+                                    : log.action === "created" 
+                                      ? `Created document: ${log.file_name || 'Unknown'}`
+                                      : '-'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        {adminLogs.length === 0 && <div className="p-12 text-center text-sm text-gray-500">No events found for your department.</div>}
+                     </div>
                    </div>
                  </div>
                )}
@@ -401,7 +491,7 @@ export default function Dashboard() {
                       <tr>
                         <th className="px-6 py-4">Ref No</th>
                         <th className="px-6 py-4">Title</th>
-                        <th className="px-6 py-4">Department ID</th>
+                        <th className="px-6 py-4">Department</th>
                         <th className="px-6 py-4">Status</th>
                         <th className="px-6 py-4 text-right">Actions</th>
                       </tr>
@@ -414,11 +504,23 @@ export default function Dashboard() {
                           <tr key={doc.id} className="hover:bg-gray-50 transition-colors group">
                             <td className="px-6 py-4 font-mono text-gray-600">{doc.reference_no}</td>
                             <td className="px-6 py-4 font-medium text-gray-900">{doc.title}</td>
-                            <td className="px-6 py-4 text-gray-500">{doc.department_id}</td>
+                            <td className="px-6 py-4 text-gray-500">{doc.department?.name || doc.department_id || "Unassigned"}</td>
                             <td className="px-6 py-4">
-                              <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${doc.status === 'Closed' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
-                                {doc.status || "Active"}
-                              </span>
+                              {user?.role_id === 1 ? (
+                                <select 
+                                  value={doc.status || "Active"} 
+                                  onChange={(e) => handleStatusChange(doc.id, e.target.value)}
+                                  className={`px-2.5 py-1 text-xs font-medium rounded-full cursor-pointer focus:ring-2 focus:ring-blue-500 border border-transparent hover:border-gray-200 transition-colors ${doc.status === 'Closed' ? 'bg-red-50 text-red-600' : doc.status === 'Pending Transfer' ? 'bg-yellow-50 text-yellow-600' : 'bg-green-50 text-green-600'}`}
+                                >
+                                  <option value="Active" className="bg-white text-gray-900">Active</option>
+                                  <option value="Pending Transfer" className="bg-white text-gray-900">Pending Transfer</option>
+                                  <option value="Closed" className="bg-white text-gray-900">Closed</option>
+                                </select>
+                              ) : (
+                                <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${doc.status === 'Closed' ? 'bg-red-50 text-red-600' : doc.status === 'Pending Transfer' ? 'bg-yellow-50 text-yellow-600' : 'bg-green-50 text-green-600'}`}>
+                                  {doc.status || "Active"}
+                                </span>
+                              )}
                             </td>
                             <td className="px-6 py-4 text-right">
                               <Link to={`/documents/${doc.id}`} className="text-blue-600 hover:text-blue-700 font-medium hover:underline">View details</Link>
@@ -572,6 +674,64 @@ export default function Dashboard() {
             </div>
           )}
 
+          {/* Transfers View Tab */}
+          {currentPath === "/transfers-view" && (
+            <div className="animate-in fade-in duration-300">
+              <div className="flex items-end justify-between mb-8">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Pending Transfers</h2>
+                  <p className="text-gray-500 mt-1 text-sm">Review and approve document transfer requests.</p>
+                </div>
+              </div>
+              
+              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                <table className="w-full text-left text-sm whitespace-nowrap">
+                  <thead className="bg-gray-50 text-gray-500 border-b border-gray-200 font-medium">
+                    <tr>
+                      <th className="px-6 py-4">Document</th>
+                      <th className="px-6 py-4">Requested By</th>
+                      <th className="px-6 py-4">Route</th>
+                      <th className="px-6 py-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {pendingTransfers.map((t: any) => (
+                      <tr key={t.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 font-medium text-gray-900">
+                           {t.document_title} <span className="text-xs text-gray-500 block">{t.reference_no}</span>
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">{t.requested_by_name}</td>
+                        <td className="px-6 py-4 text-gray-600">
+                           {t.from_department_name} <span className="font-bold mx-1 text-gray-300">→</span> {t.to_department_name}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button onClick={async () => {
+                              await api.post(`/transfer/${t.id}/approve`);
+                              const res = await api.get("/transfer/pending");
+                              setPendingTransfers(res.data);
+                          }} className="px-3 py-1.5 bg-green-50 text-green-600 hover:bg-green-100 font-medium rounded-md mr-2">Approve</button>
+
+                          <button onClick={async () => {
+                              await api.post(`/transfer/${t.id}/reject`);
+                              const res = await api.get("/transfer/pending");
+                              setPendingTransfers(res.data);
+                          }} className="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 font-medium rounded-md">Reject</button>
+                        </td>
+                      </tr>
+                    ))}
+                    {pendingTransfers.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="px-6 py-12 text-center text-gray-500">
+                          No pending transfers found. All sorted!
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
         </div>
       </main>
 
@@ -594,16 +754,22 @@ export default function Dashboard() {
               </div>
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">Department</label>
-                <select value={newDoc.department_id} onChange={(e) => setNewDoc({...newDoc, department_id: Number(e.target.value)})} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500">
-                  <option value={1}>Admin</option>
-                  <option value={2}>IT</option>
-                  <option value={3}>Finance</option>
-                  <option value={4}>HR</option>
-                </select>
+                {user?.role_id === 1 ? (
+                   <select value={newDoc.department_id} onChange={(e) => setNewDoc({...newDoc, department_id: Number(e.target.value)})} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500">
+                     <option value={0} disabled>Select Department</option>
+                     {departmentsList.map(dep => (
+                         <option key={dep.id} value={dep.id}>{dep.name}</option>
+                     ))}
+                   </select>
+                ) : (
+                   <div className="w-full border border-gray-200 bg-gray-50 text-gray-500 rounded-md px-3 py-2 text-sm">
+                      Department: {user?.department_name || departmentsList?.[0]?.name || "Unassigned"}
+                   </div>
+                )}
               </div>
               <div className="pt-4 flex justify-end gap-3">
                 <button type="button" onClick={() => setCreateModal(false)} className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg">Cancel</button>
-                <button type="submit" disabled={createLoading} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50">Create</button>
+                <button type="submit" disabled={createLoading || (!user?.department_id && user?.role_id !== 1)} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50">Create</button>
               </div>
             </form>
           </div>

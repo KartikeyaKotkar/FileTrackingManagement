@@ -1,6 +1,6 @@
-INSERT OR IGNORE INTO department (id, name) VALUES (1, 'Admin'), (2, 'IT'), (3, 'Finance'), (4, 'HR');
-INSERT OR IGNORE INTO role (id, role_name) VALUES (1, 'Admin'), (2, 'Manager'), (3, 'User');
-INSERT OR IGNORE INTO app_user (id, username, fullname, password, role_id, is_active, is_deleted)
+INSERT INTO department (id, name) VALUES (1, 'Admin'), (2, 'IT'), (3, 'Finance'), (4, 'HR') ON CONFLICT (id) DO NOTHING;
+INSERT INTO role (id, role_name) VALUES (1, 'Admin'), (2, 'Manager'), (3, 'User') ON CONFLICT (id) DO NOTHING;
+INSERT INTO app_user (id, username, fullname, password, role_id, is_active, is_deleted)
 VALUES (
     1,
     'admin',
@@ -9,4 +9,4 @@ VALUES (
     1,
     1,
     0
-);
+) ON CONFLICT (id) DO NOTHING;
