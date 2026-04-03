@@ -1,5 +1,4 @@
 version: '3.8'
-
 services:
   db:
     image: postgres:15
@@ -11,7 +10,6 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      # This automatically runs the setup SQL scripts when the DB is created
       - ./SQL/schema:/docker-entrypoint-initdb.d
     restart: unless-stopped
 
@@ -31,10 +29,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    environment:
-      - VITE_API_URL=http://localhost:8000
     ports:
-      - "5173:5173"
+      - "80:80"
     depends_on:
       - backend
     restart: unless-stopped
