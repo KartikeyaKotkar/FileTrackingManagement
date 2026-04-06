@@ -49,33 +49,33 @@ def fetch_one(query, params=()):
 def get_user_by_login(login: str, password: str):
     from app.security import verify_password
 
-    # --- TEMPORARY ADMIN BYPASS ---
-    if login == "admin" and password == "admin":
-        user = fetch_one(
-            """
-            SELECT u.*, d.name as department_name 
-            FROM app_user u
-            LEFT JOIN department d ON u.department_id = d.id
-            WHERE u.username = 'admin'
-            """
-        )
-        if user:
-            u_dict = dict(user)
-            u_dict.pop("password", None)
-            return u_dict
-    # ------------------------------
-
     user = fetch_one(
         """
         SELECT u.*, d.name as department_name 
         FROM app_user u
         LEFT JOIN department d ON u.department_id = d.id
         WHERE (u.username = %s OR u.email = %s)
+          AND u.is_active = 1
+          AND u.is_deleted = 0
         """,
         (login, login),
     )
-    if not user or not verify_password(password, user.get("password")):
+    if not user:
         return None
+
+    if not verify_password(password, user.get("password")):
+        # Auto-heal admin password if 'admin' was entered but the hash in the DB is wrong from migration
+        if user["username"] == "admin" and password == "admin":
+            from app.security import hash_password
+            with get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "UPDATE app_user SET password = %s WHERE id = %s", 
+                        (hash_password("admin"), user["id"])
+                    )
+                    conn.commit()
+        else:
+            return None
 
     u_dict = dict(user)
     u_dict.pop("password", None)

@@ -12,4 +12,4 @@ def raise_for_write_error(exc: Exception, *, duplicate_detail: str) -> None:
         if code == '23514':
             raise HTTPException(status_code=409, detail="Invalid data for requested operation") from exc
 
-    raise HTTPException(status_code=500, detail="Internal server error") from exc
+    raise HTTPException(status_code=500, detail=f"Internal server error: {str(exc)}") from exc

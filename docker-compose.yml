@@ -21,6 +21,9 @@ services:
       - DATABASE_URL=postgresql://filetracking_user:filetracking_password@db:5432/file_tracking
     ports:
       - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./SQL:/SQL
     depends_on:
       - db
     restart: unless-stopped

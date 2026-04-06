@@ -32,9 +32,12 @@ def create_department(data: DepartmentCreate, _ = Depends(require_admin), user_i
     with get_conn() as conn:
         cur = conn.cursor()
         try:
-            cur.execute("INSERT INTO department (name, description, created_by) VALUES (%s, %s, %s)", (data.name, data.description, user_id))
-            return {"id": cur.lastrowid, "name": data.name, "description": data.description, "created_by": user_id}
+            cur.execute("INSERT INTO department (name, description, created_by) VALUES (%s, %s, %s) RETURNING id", (data.name, data.description, user_id))
+            new_id = cur.fetchone()[0]
+            conn.commit()
+            return {"id": new_id, "name": data.name, "description": data.description, "created_by": user_id}
         except Exception as e:
+            conn.rollback()
             raise HTTPException(status_code=400, detail=str(e))
 
 @router.put("/{dept_id}")
@@ -48,6 +51,7 @@ def update_department(dept_id: int, data: DepartmentUpdate, _ = Depends(require_
     with get_conn() as conn:
         cur = conn.cursor()
         cur.execute("UPDATE department SET name = %s, description = %s WHERE id = %s", (data.name, data.description, dept_id))
+        conn.commit()
         return {"id": dept_id, "name": data.name, "description": data.description, "created_by": user_id}
 
 @router.delete("/{dept_id}")
@@ -61,4 +65,5 @@ def delete_department(dept_id: int, _ = Depends(require_admin), user_id: int = D
     with get_conn() as conn:
         cur = conn.cursor()
         cur.execute("DELETE FROM department WHERE id = %s", (dept_id,))
+        conn.commit()
         return {"status": "deleted"}

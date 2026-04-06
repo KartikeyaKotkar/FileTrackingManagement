@@ -29,7 +29,14 @@ def login(data: LoginRequest):
 # ----------------------------------------
 @router.post("/users")
 def create_user(data: UserCreate, _ = Depends(require_admin)):
-    role_id = 1 if data.role == "admin" else 3
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id FROM role WHERE LOWER(role_name) = %s", (data.role.lower(),))
+                row = cur.fetchone()
+                role_id = row[0] if row else None # fallback to None to avoid FK violation
+    except Exception:
+        role_id = None
     try:
         user_id = db_create_user(
             username=data.username,
