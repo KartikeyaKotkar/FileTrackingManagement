@@ -21,6 +21,13 @@ def init_events_db():
                 )
             """)
             
+            # Migration: Add tag_number to document_holder if not exists
+            try:
+                cur.execute("ALTER TABLE document_holder ADD COLUMN tag_number TEXT;")
+            except:
+                # Column might already exist, ignore error
+                pass
+            
             conn.commit()
             
     # Auto-repair sequences from SQLite-to-Postgres manual insertions using dynamic sequence fetching

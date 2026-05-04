@@ -117,7 +117,7 @@ def create_user(username, fullname, password, email, phone, role_id, created_by)
 # -----------------------------
 # Create document
 # -----------------------------
-def create_document(reference_no, title, department_id, created_by):
+def create_document(reference_no, tag_number, title, department_id, created_by):
     from app.sql_loader import sql
 
     with get_conn() as conn:
@@ -125,7 +125,7 @@ def create_document(reference_no, title, department_id, created_by):
             try:
                 cur.execute(
                     sql.documents.create_document,
-                    (reference_no, title, department_id, created_by),
+                    (reference_no, tag_number, title, department_id, created_by),
                 )
 
                 doc_id = cur.fetchone()[0]
@@ -228,6 +228,21 @@ def update_document_status(document_id, status):
         with conn.cursor() as cur:
             try:
                 cur.execute(sql.documents.update_document_status, (status, document_id))
+                updated = cur.rowcount
+                conn.commit()
+                return updated
+            except Exception:
+                conn.rollback()
+                raise
+
+
+def update_document(document_id, reference_no, tag_number, title):
+    from app.sql_loader import sql
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            try:
+                cur.execute(sql.documents.update_document, (reference_no, tag_number, title, document_id))
                 updated = cur.rowcount
                 conn.commit()
                 return updated

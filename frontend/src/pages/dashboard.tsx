@@ -6,6 +6,7 @@ import { useNavigate, Link, useLocation } from "react-router-dom";
 interface Document {
   id: number;
   reference_no: string;
+  tag_number?: string;
   title: string;
   department_id: number;
   department?: { id: number; name: string };
@@ -23,7 +24,7 @@ export default function Dashboard() {
   const [createDeptModal, setCreateDeptModal] = useState(false);
   
   // Create state
-  const [newDoc, setNewDoc] = useState({ reference_no: "", title: "", department_id: 1 });
+  const [newDoc, setNewDoc] = useState({ reference_no: "", tag_number: "", title: "", department_id: 1 });
   const [newUser, setNewUser] = useState({ username: "", password: "", role: "user" });
   const [newDept, setNewDept] = useState({ name: "", description: "" });
   const [createLoading, setCreateLoading] = useState(false);
@@ -145,7 +146,7 @@ export default function Dashboard() {
         created_by: user?.id || 1,
       });
       setCreateModal(false);
-      setNewDoc({ reference_no: "", title: "", department_id: 1 });
+      setNewDoc({ reference_no: "", tag_number: "", title: "", department_id: 1 });
       fetchDocs();
     } catch (err) {
       console.error(err);
@@ -490,6 +491,7 @@ export default function Dashboard() {
                     <thead className="bg-gray-50 text-gray-500 border-b border-gray-200 font-medium tracking-wide">
                       <tr>
                         <th className="px-6 py-4">Ref No</th>
+                        <th className="px-6 py-4">Tag No</th>
                         <th className="px-6 py-4">Title</th>
                         <th className="px-6 py-4">Department</th>
                         <th className="px-6 py-4">Status</th>
@@ -503,6 +505,7 @@ export default function Dashboard() {
                         documents.map((doc) => (
                           <tr key={doc.id} className="hover:bg-gray-50 transition-colors group">
                             <td className="px-6 py-4 font-mono text-gray-600">{doc.reference_no}</td>
+                            <td className="px-6 py-4 font-mono text-gray-500">{doc.tag_number || "-"}</td>
                             <td className="px-6 py-4 font-medium text-gray-900">{doc.title}</td>
                             <td className="px-6 py-4 text-gray-500">{doc.department?.name || doc.department_id || "Unassigned"}</td>
                             <td className="px-6 py-4">
@@ -747,6 +750,10 @@ export default function Dashboard() {
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">Reference Number</label>
                 <input required type="text" value={newDoc.reference_no} onChange={(e) => setNewDoc({...newDoc, reference_no: e.target.value})} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="DOC-2024-001" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">Tag Number</label>
+                <input type="text" value={newDoc.tag_number} onChange={(e) => setNewDoc({...newDoc, tag_number: e.target.value})} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="TAG-12345" />
               </div>
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">Title</label>

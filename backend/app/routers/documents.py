@@ -5,9 +5,10 @@ from app.database import (
     fetch_all,
     fetch_one,
     update_document_status,
+    update_document as update_document_record,
 )
 from app.errors import raise_for_write_error
-from app.models.schemas import DocumentCreate, DocumentStatusUpdate
+from app.models.schemas import DocumentCreate, DocumentStatusUpdate, DocumentUpdate
 from app.sql_loader import sql
 from app.deps import get_current_user_role, get_current_user_dept, check_file_access
 
@@ -55,6 +56,7 @@ def create_document(data: DocumentCreate, role: str = Depends(get_current_user_r
     try:
         doc_id = create_document_record(
             data.reference_no,
+            data.tag_number,
             data.title,
             data.department_id,
             data.created_by,
@@ -80,3 +82,27 @@ def patch_document_status(doc_id: int, data: DocumentStatusUpdate, role: str = D
         raise
     except Exception as e:
         raise_for_write_error(e, duplicate_detail="Document status update conflict")
+
+
+@router.put("/{doc_id}")
+def update_document(doc_id: int, data: DocumentUpdate, role: str = Depends(get_current_user_role), dept_id: int = Depends(get_current_user_dept)):
+    document = fetch_one(sql.documents.get_document, (doc_id,))
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    # Optional: ensure user is owner or admin to edit full document info
+    if role != "admin" and document["department_id"] != dept_id:
+        raise HTTPException(status_code=403, detail="Not authorized to edit this document")
+    
+    try:
+        updated = update_document_record(
+            doc_id,
+            data.reference_no,
+            data.tag_number,
+            data.title
+        )
+        if updated == 0:
+            raise HTTPException(status_code=404, detail="Document not found")
+        return {"document_id": doc_id, "updated": True}
+    except Exception as e:
+        raise_for_write_error(e, duplicate_detail="Reference number already exists")

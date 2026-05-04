@@ -6,9 +6,16 @@ from pydantic import BaseModel
 # ----------------------------------------
 class DocumentCreate(BaseModel):
     reference_no: str
+    tag_number: str | None = None
     title: str
     department_id: int
     created_by: int
+
+
+class DocumentUpdate(BaseModel):
+    reference_no: str | None = None
+    tag_number: str | None = None
+    title: str | None = None
 
 
 class DocumentStatusUpdate(BaseModel):

@@ -17,6 +17,10 @@ export default function DocumentDetail() {
   // Forms
   const [newVersion, setNewVersion] = useState({ version_no: 1, file_name: "", file_path: "" });
   const [newMovement, setNewMovement] = useState({ to_dept: "", to_user_id: "" });
+  
+  const [editModal, setEditModal] = useState(false);
+  const [editDoc, setEditDoc] = useState({ reference_no: "", tag_number: "", title: "" });
+  const [editLoading, setEditLoading] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -83,6 +87,30 @@ export default function DocumentDetail() {
     }
   };
 
+  const handleEditDocument = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEditLoading(true);
+    try {
+      await api.put(`/documents/${id}`, editDoc);
+      setEditModal(false);
+      fetchData();
+    } catch (err: any) {
+      console.error(err);
+      alert(err.response?.data?.detail || "Failed to update document");
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const openEditModal = () => {
+    setEditDoc({
+      reference_no: doc.reference_no,
+      tag_number: doc.tag_number || "",
+      title: doc.title
+    });
+    setEditModal(true);
+  };
+
   if (loading) return <div className="p-8">Loading...</div>;
   if (!doc) return <div className="p-8">Document not found</div>;
 
@@ -96,9 +124,21 @@ export default function DocumentDetail() {
         {/* Left Column: Details & Versions */}
         <div className="lg:col-span-2 space-y-8">
           {/* Doc Header */}
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-            <h1 className="text-2xl font-bold text-gray-900">{doc.title}</h1>
-            <p className="text-gray-500 font-mono text-sm mt-1">{doc.reference_no}</p>
+          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm relative">
+            <div className="flex justify-between items-start">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">{doc.title}</h1>
+                <p className="text-gray-500 font-mono text-sm mt-1">
+                  Ref: {doc.reference_no} 
+                  {doc.tag_number && <span className="ml-4">Tag: {doc.tag_number}</span>}
+                </p>
+              </div>
+              {(user?.role_id === 1 || user?.department_id === doc.department_id) && (
+                <button onClick={openEditModal} className="text-blue-600 hover:text-blue-800 text-sm font-medium border border-blue-200 hover:bg-blue-50 px-3 py-1.5 rounded-md transition-colors">
+                  Edit Details
+                </button>
+              )}
+            </div>
             <div className="mt-4 flex gap-4">
               <span className="bg-blue-50 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-full">Dept: {doc.department?.name || doc.department_id || "Unassigned"}</span>
               <span className="bg-green-50 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full">{doc.status}</span>
@@ -199,5 +239,35 @@ export default function DocumentDetail() {
         </div>
       </div>
     </div>
+    
+    {editModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 p-4">
+        <div className="bg-white rounded-xl shadow-lg w-full max-w-md overflow-hidden relative">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h3 className="font-semibold text-lg">Edit Document</h3>
+            <button onClick={() => setEditModal(false)} className="text-gray-400 hover:text-gray-600">×</button>
+          </div>
+          <form onSubmit={handleEditDocument} className="p-6 space-y-4">
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">Reference Number</label>
+              <input required type="text" value={editDoc.reference_no} onChange={(e) => setEditDoc({...editDoc, reference_no: e.target.value})} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">Tag Number</label>
+              <input type="text" value={editDoc.tag_number} onChange={(e) => setEditDoc({...editDoc, tag_number: e.target.value})} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">Title</label>
+              <input required type="text" value={editDoc.title} onChange={(e) => setEditDoc({...editDoc, title: e.target.value})} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" />
+            </div>
+            <div className="pt-4 flex justify-end gap-3">
+              <button type="button" onClick={() => setEditModal(false)} className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg">Cancel</button>
+              <button type="submit" disabled={editLoading} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50">Save Changes</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
+  </div>
   );
 }

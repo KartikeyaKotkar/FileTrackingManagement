@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS app_user (
 CREATE TABLE IF NOT EXISTS document_holder (
     id                           SERIAL PRIMARY KEY,
     reference_no                 TEXT NOT NULL UNIQUE,
+    tag_number                   TEXT,
     title                        TEXT NOT NULL,
     department_id                INTEGER NOT NULL DEFAULT 1 REFERENCES department (id) ON DELETE RESTRICT,
     current_version_id           INTEGER,

@@ -1,6 +1,7 @@
 SELECT
   d.id,
   d.reference_no,
+  d.tag_number,
   d.title,
   d.status,
   d.created_at,
