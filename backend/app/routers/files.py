@@ -79,6 +79,8 @@ def get_department_logs(dept_id: int = Depends(get_current_user_dept)):
                u.username as performed_by, 
                a.username as approved_by,
                dh.title as file_name,
+               dh.reference_no,
+               dh.tag_number,
                e.timestamp
         FROM file_event e
         LEFT JOIN department d1 ON e.from_department = d1.id

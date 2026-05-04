@@ -9,7 +9,7 @@ router = APIRouter(prefix="/transfer", tags=["Transfers"])
 @router.get("/pending")
 def get_pending_transfers(_: str = Depends(require_admin)):
     query = """
-        SELECT t.*, dh.title as document_title, dh.reference_no, 
+        SELECT t.*, dh.title as document_title, dh.reference_no, dh.tag_number,
                d1.name as from_department_name, d2.name as to_department_name,
                u.username as requested_by_name
         FROM transfer_request t

@@ -13,6 +13,8 @@ def get_admin_logs(_=Depends(require_admin)):
                u.username as performed_by, 
                a.username as approved_by,
                dh.title as file_name,
+               dh.reference_no,
+               dh.tag_number,
                e.timestamp
         FROM file_event e
         LEFT JOIN department d1 ON e.from_department = d1.id

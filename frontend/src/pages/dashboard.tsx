@@ -381,7 +381,7 @@ export default function Dashboard() {
                                 <td className="px-6 py-3 font-medium capitalize text-gray-900">{log.action}</td>
                                 <td className="px-6 py-3 text-gray-600">{log.performed_by || 'System'}</td>
                                 <td className="px-6 py-3 font-mono text-gray-500 text-xs">
-                                  #{log.file_id} {log.file_name ? `- ${log.file_name}` : ''}
+                                  #{log.file_id} {log.reference_no && `[${log.reference_no}]`} {log.tag_number && `(${log.tag_number})`} {log.file_name ? `- ${log.file_name}` : ''}
                                 </td>
                                 <td className="px-6 py-3 text-gray-600">
                                   {log.approved_by || '-'}
@@ -435,7 +435,7 @@ export default function Dashboard() {
                                 <td className="px-6 py-3 font-medium capitalize text-gray-900">{log.action}</td>
                                 <td className="px-6 py-3 text-gray-600">{log.performed_by || 'System'}</td>
                                 <td className="px-6 py-3 font-mono text-gray-500 text-xs">
-                                  #{log.file_id} {log.file_name ? `- ${log.file_name}` : ''}
+                                  #{log.file_id} {log.reference_no && `[${log.reference_no}]`} {log.tag_number && `(${log.tag_number})`} {log.file_name ? `- ${log.file_name}` : ''}
                                 </td>
                                 <td className="px-6 py-3 text-gray-600">
                                   {log.approved_by || '-'}
@@ -701,7 +701,7 @@ export default function Dashboard() {
                     {pendingTransfers.map((t: any) => (
                       <tr key={t.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 font-medium text-gray-900">
-                           {t.document_title} <span className="text-xs text-gray-500 block">{t.reference_no}</span>
+                           {t.document_title} <span className="text-xs text-gray-500 block">{t.reference_no} {t.tag_number && `(${t.tag_number})`}</span>
                         </td>
                         <td className="px-6 py-4 text-gray-600">{t.requested_by_name}</td>
                         <td className="px-6 py-4 text-gray-600">

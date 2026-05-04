@@ -177,40 +177,40 @@ export default function DocumentDetail() {
           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
             <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><Send className="w-5 h-5"/> Request Transfer</h2>
             {transferStatus ? (
-               <div className="flex flex-col gap-3 text-sm font-medium p-6 bg-amber-50 rounded-xl border border-amber-200 text-amber-700 text-center items-center">
-                  <span className="text-3xl mb-1">⏳</span>
-                  <span className="bg-amber-100 px-3 py-1 rounded-full text-xs box-content border border-amber-200 shadow-sm">Pending Approval</span>
-                  <p className="text-amber-800 max-w-[200px]">Waiting for an admin to approve the transfer destination.</p>
-               </div>
+              <div className="flex flex-col gap-3 text-sm font-medium p-6 bg-amber-50 rounded-xl border border-amber-200 text-amber-700 text-center items-center">
+                <span className="text-3xl mb-1">⏳</span>
+                <span className="bg-amber-100 px-3 py-1 rounded-full text-xs box-content border border-amber-200 shadow-sm">Pending Approval</span>
+                <p className="text-amber-800 max-w-[200px]">Waiting for an admin to approve the transfer destination.</p>
+              </div>
             ) : (
-               <form onSubmit={handleTransferRequest} className="space-y-4">
-                 <div>
-                   <label className="text-sm font-medium text-gray-700 mb-1.5 block">Transfer To Department</label>
-                   <select required value={newMovement.to_dept} onChange={e => setNewMovement({to_dept: e.target.value, to_user_id: ""})} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 bg-gray-50">
-                     <option value="" disabled>Select a destination</option>
-                     {departmentsList.map(dep => (
-                        <option key={dep.id} value={dep.id}>{dep.name}</option>
-                     ))}
-                   </select>
-                 </div>
-                 {newMovement.to_dept && (
-                 <div>
-                   <label className="text-sm font-medium text-gray-700 mb-1.5 block">Transfer To Person</label>
-                   <select value={newMovement.to_user_id} onChange={e => setNewMovement({...newMovement, to_user_id: e.target.value})} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 bg-gray-50">
-                     <option value="">Shared Inbox (Department)</option>
-                     {usersList.filter((u: any) => u.department_id === Number(newMovement.to_dept)).map((u: any) => (
+              <form onSubmit={handleTransferRequest} className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-1.5 block">Transfer To Department</label>
+                  <select required value={newMovement.to_dept} onChange={e => setNewMovement({to_dept: e.target.value, to_user_id: ""})} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 bg-gray-50">
+                    <option value="" disabled>Select a destination</option>
+                    {departmentsList.map(dep => (
+                      <option key={dep.id} value={dep.id}>{dep.name}</option>
+                    ))}
+                  </select>
+                </div>
+                {newMovement.to_dept && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-1.5 block">Transfer To Person</label>
+                    <select value={newMovement.to_user_id} onChange={e => setNewMovement({...newMovement, to_user_id: e.target.value})} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 bg-gray-50">
+                      <option value="">Shared Inbox (Department)</option>
+                      {usersList.filter((u: any) => u.department_id === Number(newMovement.to_dept)).map((u: any) => (
                         <option key={u.id} value={u.id}>{u.fullname || u.username}</option>
-                     ))}
-                   </select>
-                 </div>
-                 )}
-                 <button type="submit" disabled={user?.role_id !== 1 && user?.department_id !== doc?.department_id} className="w-full bg-blue-600 text-white rounded-md px-4 py-3 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm">
-                   Request Transfer
-                 </button>
-                 {user?.role_id !== 1 && user?.department_id !== doc?.department_id && (
-                     <p className="text-xs text-red-500 text-center">You must own this document to request a transfer.</p>
-                 )}
-               </form>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <button type="submit" disabled={user?.role_id !== 1 && user?.department_id !== doc?.department_id} className="w-full bg-blue-600 text-white rounded-md px-4 py-3 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm">
+                  Request Transfer
+                </button>
+                {user?.role_id !== 1 && user?.department_id !== doc?.department_id && (
+                  <p className="text-xs text-red-500 text-center">You must own this document to request a transfer.</p>
+                )}
+              </form>
             )}
           </div>
 
@@ -238,7 +238,6 @@ export default function DocumentDetail() {
           </div>
         </div>
       </div>
-    </div>
     
     {editModal && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 p-4">
