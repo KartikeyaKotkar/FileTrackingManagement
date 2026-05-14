@@ -12,6 +12,7 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/documents" element={<Dashboard />} />
         <Route path="/settings" element={<Dashboard />} />
+        <Route path="/tag-reads" element={<Dashboard />} />
         <Route path="/departments-view" element={<Dashboard />} />
         <Route path="/users-view" element={<Dashboard />} />
         <Route path="/transfers-view" element={<Dashboard />} />

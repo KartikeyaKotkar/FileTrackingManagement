@@ -17,3 +17,16 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+export interface TagReadPayload {
+  epc: string;
+  reader_name: string;
+  antenna: number;
+  timestamp: string;
+  rssi: number;
+}
+
+export const postTagRead = async (payload: TagReadPayload) => {
+  const response = await api.post("/api/tagreads", payload);
+  return response.data;
+};
