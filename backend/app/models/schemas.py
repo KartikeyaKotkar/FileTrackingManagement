@@ -1,6 +1,4 @@
-from datetime import datetime, timezone
-
-from pydantic import BaseModel, ConfigDict, StrictInt, field_validator
+from pydantic import BaseModel
 
 
 # ----------------------------------------
@@ -94,37 +92,3 @@ class DepartmentCreate(BaseModel):
 class DepartmentUpdate(BaseModel):
     name: str
     description: str | None = None
-
-
-# ----------------------------------------
-# RFID Tag Reads
-# ----------------------------------------
-class TagReadCreate(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
-
-    epc: str
-    reader_name: str
-    antenna: StrictInt
-    timestamp: datetime
-    rssi: StrictInt
-
-    @field_validator("epc")
-    @classmethod
-    def validate_epc(cls, value: str) -> str:
-        if not value:
-            raise ValueError("epc cannot be empty")
-        return value
-
-    @field_validator("reader_name")
-    @classmethod
-    def validate_reader_name(cls, value: str) -> str:
-        if not value:
-            raise ValueError("reader_name cannot be empty")
-        return value
-
-    @field_validator("timestamp")
-    @classmethod
-    def validate_timestamp(cls, value: datetime) -> datetime:
-        if value.tzinfo is None or value.utcoffset() is None:
-            raise ValueError("timestamp must include timezone information")
-        return value.astimezone(timezone.utc)
