@@ -25,7 +25,7 @@ export default function DocumentDetail() {
         api.get(`/documents/${id}`),
         api.get(`/files/${id}/history`),
         api.get(`/files/${id}/transfer-status`),
-        api.get(`/departments/?all=true`),
+        api.get(`/departments/all`),
       ]);
       setDoc(docRes.data);
       setEvents(evtRes.data);

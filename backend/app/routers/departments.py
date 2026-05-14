@@ -21,6 +21,11 @@ def get_current_user_id(x_user_id: int = Header(default=0)):
 def get_current_user_role(x_user_role: str = Header(default="user")):
     return x_user_role
 
+@router.get("/all")
+def get_all_departments(user_id: int = Depends(get_current_user_id)):
+    """Return all departments (id + name) for any authenticated user (used in dropdowns)."""
+    return fetch_all("SELECT id, name FROM department ORDER BY name")
+
 @router.get("/")
 def get_departments(role: str = Depends(get_current_user_role), user_id: int = Depends(get_current_user_id)):
     if role == "admin":
