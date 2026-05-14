@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timezone
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from contextlib import contextmanager
@@ -246,6 +247,28 @@ def update_document(document_id, reference_no, tag_number, title):
                 updated = cur.rowcount
                 conn.commit()
                 return updated
+            except Exception:
+                conn.rollback()
+                raise
+
+
+def create_tag_read(epc: str, reader_name: str, antenna: int, timestamp: datetime, rssi: int):
+    timestamp_utc = timestamp.astimezone(timezone.utc)
+
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            try:
+                cur.execute(
+                    """
+                    INSERT INTO tag_reads (epc, reader_name, antenna, timestamp, rssi)
+                    VALUES (%s, %s, %s, %s, %s)
+                    RETURNING id, epc, reader_name, antenna, timestamp, rssi, created_at
+                    """,
+                    (epc, reader_name, antenna, timestamp_utc, rssi),
+                )
+                row = cur.fetchone()
+                conn.commit()
+                return dict(row) if row else None
             except Exception:
                 conn.rollback()
                 raise

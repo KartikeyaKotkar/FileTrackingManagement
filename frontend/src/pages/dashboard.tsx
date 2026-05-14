@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { api } from "../services/api";
-import { FileText, LogOut, LayoutDashboard, Settings, Search, RefreshCw, Plus, X, Send } from "lucide-react";
+import { api, postTagRead } from "../services/api";
+import { FileText, LogOut, LayoutDashboard, Settings, Search, RefreshCw, Plus, X, Send, Radio } from "lucide-react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 
 interface Document {
@@ -36,6 +36,16 @@ export default function Dashboard() {
   const [departmentsList, setDepartmentsList] = useState<any[]>([]);
   const [usersList, setUsersList] = useState<any[]>([]);
   const [pendingTransfers, setPendingTransfers] = useState<any[]>([]);
+  const [tagReadForm, setTagReadForm] = useState({
+    epc: "",
+    reader_name: "",
+    antenna: 1,
+    timestamp: new Date().toISOString().slice(0, 16),
+    rssi: -45,
+  });
+  const [tagReadSubmitting, setTagReadSubmitting] = useState(false);
+  const [tagReadError, setTagReadError] = useState("");
+  const [tagReadSuccess, setTagReadSuccess] = useState("");
   
   // Assignment state
   const [assignDeptModal, setAssignDeptModal] = useState<number | null>(null);
@@ -247,6 +257,42 @@ export default function Dashboard() {
     }
   };
 
+  const handleTagReadSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTagReadSubmitting(true);
+    setTagReadError("");
+    setTagReadSuccess("");
+
+    try {
+      const payload = {
+        epc: tagReadForm.epc.trim(),
+        reader_name: tagReadForm.reader_name.trim(),
+        antenna: Number(tagReadForm.antenna),
+        timestamp: new Date(tagReadForm.timestamp).toISOString(),
+        rssi: Number(tagReadForm.rssi),
+      };
+
+      const response = await postTagRead(payload);
+      setTagReadSuccess(`Saved tag read #${response.tag_read.id}.`);
+      setTagReadForm({
+        epc: "",
+        reader_name: "",
+        antenna: 1,
+        timestamp: new Date().toISOString().slice(0, 16),
+        rssi: -45,
+      });
+    } catch (err: any) {
+      console.error(err);
+      const detail = err.response?.data?.detail;
+      const message = Array.isArray(detail)
+        ? detail.map((item: any) => item.msg).join(", ")
+        : detail || "Failed to submit tag read.";
+      setTagReadError(message);
+    } finally {
+      setTagReadSubmitting(false);
+    }
+  };
+
   const renderPieChart = () => {
     if (!adminStats || !adminStats.movement_counts_by_action) return null;
     const total = adminStats.movement_counts_by_action.reduce((sum: number, a: any) => sum + a.count, 0) || 1;
@@ -287,6 +333,7 @@ export default function Dashboard() {
         <nav className="flex-1 py-6 flex flex-col gap-2 px-3">
           <NavItem to="/dashboard" icon={<LayoutDashboard />} label={user?.role_id === 1 ? "Admin Dashboard" : "Dashboard"} active={currentPath === "/dashboard"} />
           <NavItem to="/documents" icon={<FileText />} label="Documents" active={currentPath === "/documents"} />
+          <NavItem to="/tag-reads" icon={<Radio />} label="Tag Reads" active={currentPath === "/tag-reads"} />
           {user?.role_id === 1 && (
             <>
              <NavItem to="/users-view" icon={<LayoutDashboard />} label="Users" active={currentPath === "/users-view"} />
@@ -539,6 +586,107 @@ export default function Dashboard() {
                       )}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Tag Reads Tab */}
+          {currentPath === "/tag-reads" && (
+            <div className="animate-in fade-in duration-300 space-y-8">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">RFID Tag Reads</h2>
+                <p className="text-gray-500 mt-1 text-sm">Submit RFID reader payloads to the backend ingestion endpoint.</p>
+              </div>
+
+              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-6">
+                <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                  <h3 className="text-lg font-bold text-gray-900 mb-6">New Tag Read</h3>
+
+                  <form onSubmit={handleTagReadSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">EPC</label>
+                      <input
+                        type="text"
+                        value={tagReadForm.epc}
+                        onChange={(e) => setTagReadForm({ ...tagReadForm, epc: e.target.value })}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="300833B2DDD9014000000000"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Reader Name</label>
+                      <input
+                        type="text"
+                        value={tagReadForm.reader_name}
+                        onChange={(e) => setTagReadForm({ ...tagReadForm, reader_name: e.target.value })}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Gate Reader A"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Antenna</label>
+                      <input
+                        type="number"
+                        value={tagReadForm.antenna}
+                        onChange={(e) => setTagReadForm({ ...tagReadForm, antenna: Number(e.target.value) })}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Timestamp</label>
+                      <input
+                        type="datetime-local"
+                        value={tagReadForm.timestamp}
+                        onChange={(e) => setTagReadForm({ ...tagReadForm, timestamp: e.target.value })}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">RSSI</label>
+                      <input
+                        type="number"
+                        value={tagReadForm.rssi}
+                        onChange={(e) => setTagReadForm({ ...tagReadForm, rssi: Number(e.target.value) })}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+                        required
+                      />
+                    </div>
+
+                    <div className="md:col-span-2 flex items-center gap-3 pt-2">
+                      <button
+                        type="submit"
+                        disabled={tagReadSubmitting}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                      >
+                        {tagReadSubmitting ? "Submitting..." : "Submit Tag Read"}
+                      </button>
+
+                      {tagReadError && <p className="text-sm text-red-600">{tagReadError}</p>}
+                      {tagReadSuccess && <p className="text-sm text-green-600">{tagReadSuccess}</p>}
+                    </div>
+                  </form>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                  <h3 className="text-lg font-bold text-gray-900 mb-4">Payload Example</h3>
+                  <pre className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-xs text-gray-700 overflow-x-auto">
+{`{
+  "epc": "300833B2DDD9014000000000",
+  "reader_name": "Gate Reader A",
+  "antenna": 1,
+  "timestamp": "2026-05-14T12:00:00Z",
+  "rssi": -45
+}`}
+                  </pre>
                 </div>
               </div>
             </div>
