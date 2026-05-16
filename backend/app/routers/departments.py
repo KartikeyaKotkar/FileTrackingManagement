@@ -6,13 +6,6 @@ from app.models.schemas import DepartmentCreate, DepartmentUpdate
 
 router = APIRouter(prefix="/departments", tags=["Departments"])
 
-try:
-    with get_conn() as conn:
-        conn.execute("ALTER TABLE department ADD COLUMN description TEXT")
-        conn.execute("ALTER TABLE department ADD COLUMN created_by INTEGER")
-except Exception:
-    pass
-
 def get_current_user_id(x_user_id: int = Header(default=0)):
     if not x_user_id:
         raise HTTPException(status_code=401, detail="Missing X-User-Id req")

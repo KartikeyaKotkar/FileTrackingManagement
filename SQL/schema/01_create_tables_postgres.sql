@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS document_holder (
     current_holder_user_id       INTEGER REFERENCES app_user (id),
     current_holder_department_id INTEGER REFERENCES department (id),
     last_movement_id             INTEGER,
-    status                       TEXT NOT NULL DEFAULT 'Active' CHECK (status IN ('Open', 'Active', 'Closed')),
+    status                       TEXT NOT NULL DEFAULT 'Active' CHECK (status IN ('Open', 'Active', 'Closed', 'Pending Transfer')),
     created_by                   INTEGER REFERENCES app_user (id) ON DELETE SET NULL,
     created_at                   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -142,6 +142,7 @@ CREATE TABLE IF NOT EXISTS transfer_request (
     from_department_id  INTEGER NOT NULL REFERENCES department (id),
     to_department_id    INTEGER NOT NULL REFERENCES department (id),
     requested_by        INTEGER NOT NULL REFERENCES app_user (id),
+    to_user_id          INTEGER REFERENCES app_user (id),
     status              TEXT DEFAULT 'pending',
     approved_by         INTEGER REFERENCES app_user (id),
     timestamp           TIMESTAMP DEFAULT CURRENT_TIMESTAMP

@@ -29,14 +29,13 @@ def login(data: LoginRequest):
 # ----------------------------------------
 @router.post("/users")
 def create_user(data: UserCreate, _ = Depends(require_admin)):
-    try:
-        with get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT id FROM role WHERE LOWER(role_name) = %s", (data.role.lower(),))
-                row = cur.fetchone()
-                role_id = row[0] if row else None # fallback to None to avoid FK violation
-    except Exception:
-        role_id = None
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM role WHERE LOWER(role_name) = %s", (data.role.lower(),))
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=400, detail=f"Role '{data.role}' not found")
+            role_id = row[0]
     try:
         user_id = db_create_user(
             username=data.username,
@@ -60,9 +59,13 @@ def create_user(data: UserCreate, _ = Depends(require_admin)):
 def list_users():
     return fetch_all("""
         SELECT u.id, u.username, u.fullname, u.email, u.role_id, 
-               u.department_id, d.name as department_name 
+               u.department_id, d.name as department_name,
+               u.is_active, u.is_deleted, r.role_name
         FROM app_user u 
         LEFT JOIN department d ON u.department_id = d.id
+        LEFT JOIN role r ON u.role_id = r.id
+        WHERE u.is_deleted = 0
+        ORDER BY u.created_at DESC
     """)
 
 class AssignDepartmentReq(BaseModel):
@@ -110,13 +113,16 @@ def update_user(user_id: int, data: UserUpdate, _ = Depends(require_admin)):
                     email = COALESCE(%s, email),
                     role_id = COALESCE(%s, role_id),
                     is_active = COALESCE(%s, is_active)
-                WHERE id = %s
+                WHERE id = %s AND is_deleted = 0
             """, (data.fullname, data.email, role_id, data.is_active, user_id))
             conn.commit()
             if cur.rowcount == 0:
                 raise HTTPException(status_code=404, detail="User not found")
             return {"status": "updated"}
+        except HTTPException:
+            raise
         except Exception as e:
+            conn.rollback()
             raise HTTPException(status_code=400, detail=str(e))
 
 
