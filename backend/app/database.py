@@ -252,7 +252,14 @@ def update_document(document_id, reference_no, tag_number, title):
                 raise
 
 
-def create_tag_read(epc: str, reader_name: str, antenna: int, timestamp: datetime, rssi: int):
+def create_tag_read(
+    epc: str,
+    reader_name: str,
+    antenna: int,
+    timestamp: datetime,
+    rssi: int,
+    location: str,
+):
     timestamp_utc = timestamp.astimezone(timezone.utc)
 
     with get_conn() as conn:
@@ -260,11 +267,11 @@ def create_tag_read(epc: str, reader_name: str, antenna: int, timestamp: datetim
             try:
                 cur.execute(
                     """
-                    INSERT INTO tag_reads (epc, reader_name, antenna, timestamp, rssi)
-                    VALUES (%s, %s, %s, %s, %s)
-                    RETURNING id, epc, reader_name, antenna, timestamp, rssi, created_at
+                    INSERT INTO tag_reads (epc, reader_name, antenna, timestamp, rssi, location)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    RETURNING id, epc, reader_name, antenna, timestamp, rssi, location, created_at
                     """,
-                    (epc, reader_name, antenna, timestamp_utc, rssi),
+                    (epc, reader_name, antenna, timestamp_utc, rssi, location),
                 )
                 row = cur.fetchone()
                 conn.commit()

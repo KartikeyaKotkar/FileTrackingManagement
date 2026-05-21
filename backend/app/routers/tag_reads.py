@@ -30,6 +30,7 @@ async def create_tag_read_endpoint(request: Request):
             antenna=data.antenna,
             timestamp=data.timestamp,
             rssi=data.rssi,
+            location=data.location,
         )
         return {
             "message": "Tag read created successfully",

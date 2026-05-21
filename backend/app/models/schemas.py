@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from pydantic import BaseModel, ConfigDict, StrictInt, field_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, StrictInt, field_validator
 
 
 # ----------------------------------------
@@ -100,17 +100,22 @@ class DepartmentUpdate(BaseModel):
 # RFID Tag Reads
 # ----------------------------------------
 class TagReadCreate(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(populate_by_name=True)
 
     epc: str
-    reader_name: str
+    reader_name: str = Field(
+        validation_alias=AliasChoices("readerName", "reader_name"),
+        serialization_alias="readerName",
+    )
     antenna: StrictInt
     timestamp: datetime
     rssi: StrictInt
+    location: str
 
     @field_validator("epc")
     @classmethod
     def validate_epc(cls, value: str) -> str:
+        value = value.strip()
         if not value:
             raise ValueError("epc cannot be empty")
         return value
@@ -118,8 +123,16 @@ class TagReadCreate(BaseModel):
     @field_validator("reader_name")
     @classmethod
     def validate_reader_name(cls, value: str) -> str:
+        value = value.strip()
         if not value:
             raise ValueError("reader_name cannot be empty")
+        return value
+
+    @field_validator("location")
+    @classmethod
+    def validate_location(cls, value: str) -> str:
+        if value == "":
+            raise ValueError("location cannot be empty")
         return value
 
     @field_validator("timestamp")
