@@ -1,6 +1,4 @@
-from fastapi import APIRouter, HTTPException, Request, status
-from fastapi.encoders import jsonable_encoder
-from pydantic import ValidationError
+from fastapi import APIRouter, HTTPException, status
 
 from app.database import create_tag_read
 from app.models.schemas import TagReadCreate
@@ -9,20 +7,7 @@ router = APIRouter(prefix="/api/tagreads", tags=["Tag Reads"])
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-async def create_tag_read_endpoint(request: Request):
-    try:
-        payload = await request.json()
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail="Invalid JSON payload") from exc
-
-    try:
-        data = TagReadCreate.model_validate(payload)
-    except ValidationError as exc:
-        raise HTTPException(
-            status_code=400,
-            detail=jsonable_encoder(exc.errors()),
-        ) from exc
-
+async def create_tag_read_endpoint(data: TagReadCreate):
     try:
         record = create_tag_read(
             epc=data.epc,

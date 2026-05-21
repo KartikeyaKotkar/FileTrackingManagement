@@ -100,10 +100,23 @@ class DepartmentUpdate(BaseModel):
 # RFID Tag Reads
 # ----------------------------------------
 class TagReadCreate(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(
+        populate_by_name=True,
+        json_schema_extra={
+            "example": {
+                "epc": "string",
+                "readerName": "string",
+                "antenna": 0,
+                "timestamp": "2026-05-21T00:00:00",
+                "rssi": 0,
+                "location": "string",
+            }
+        },
+    )
 
     epc: str
     reader_name: str = Field(
+        alias="readerName",
         validation_alias=AliasChoices("readerName", "reader_name"),
         serialization_alias="readerName",
     )
