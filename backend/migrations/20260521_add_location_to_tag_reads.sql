@@ -1,0 +1,2 @@
+ALTER TABLE tag_reads
+ADD COLUMN IF NOT EXISTS location TEXT;
