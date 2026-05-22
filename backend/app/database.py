@@ -279,3 +279,13 @@ def create_tag_read(
             except Exception:
                 conn.rollback()
                 raise
+
+
+def get_tag_reads():
+    return fetch_all(
+        """
+        SELECT id, epc, reader_name, antenna, timestamp, rssi, location, created_at
+        FROM tag_reads
+        ORDER BY timestamp DESC, id DESC
+        """
+    )

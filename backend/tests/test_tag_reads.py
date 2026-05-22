@@ -121,9 +121,41 @@ def test_create_tag_read_endpoint_passes_location_through(monkeypatch):
     assert response["tag_read"]["location"] == "Gate-7"
 
 
+def test_get_tag_reads_endpoint_returns_records(monkeypatch):
+    expected = [
+        {
+            "id": 2,
+            "epc": "EPC-456",
+            "reader_name": "Reader B",
+            "antenna": 1,
+            "timestamp": "2026-05-21T10:30:00+00:00",
+            "rssi": -41,
+            "location": "Shelf B-02",
+            "created_at": "2026-05-21T10:30:05+00:00",
+        }
+    ]
+
+    fake_database = types.ModuleType("app.database")
+    fake_database.create_tag_read = lambda *args, **kwargs: None
+    fake_database.get_tag_reads = lambda: expected
+    monkeypatch.setitem(sys.modules, "app.database", fake_database)
+
+    module_path = Path(__file__).resolve().parents[1] / "app" / "routers" / "tag_reads.py"
+    spec = importlib.util.spec_from_file_location("tag_reads_get_under_test", module_path)
+    tag_reads = importlib.util.module_from_spec(spec)
+    assert spec is not None
+    assert spec.loader is not None
+    spec.loader.exec_module(tag_reads)
+
+    response = asyncio.run(tag_reads.get_tag_reads_endpoint())
+
+    assert response == {"tag_reads": expected}
+
+
 def test_tag_read_openapi_schema_shows_request_body_fields(monkeypatch):
     fake_database = types.ModuleType("app.database")
     fake_database.create_tag_read = lambda *args, **kwargs: None
+    fake_database.get_tag_reads = lambda: []
     monkeypatch.setitem(sys.modules, "app.database", fake_database)
 
     module_path = Path(__file__).resolve().parents[1] / "app" / "routers" / "tag_reads.py"
@@ -143,3 +175,4 @@ def test_tag_read_openapi_schema_shows_request_body_fields(monkeypatch):
     properties = schema["components"]["schemas"][schema_name]["properties"]
 
     assert set(properties) == {"epc", "readerName", "antenna", "timestamp", "rssi", "location"}
+    assert "get" in schema["paths"]["/api/tagreads"]

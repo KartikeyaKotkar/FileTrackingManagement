@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, postTagRead } from "../services/api";
+import { api, getTagReads, postTagRead, type TagReadRecord } from "../services/api";
 import { FileText, LogOut, LayoutDashboard, Settings, Search, RefreshCw, Plus, X, Send, Radio } from "lucide-react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 
@@ -52,6 +52,9 @@ export default function Dashboard() {
   const [tagReadSubmitting, setTagReadSubmitting] = useState(false);
   const [tagReadError, setTagReadError] = useState("");
   const [tagReadSuccess, setTagReadSuccess] = useState("");
+  const [tagReads, setTagReads] = useState<TagReadRecord[]>([]);
+  const [tagReadsLoading, setTagReadsLoading] = useState(false);
+  const [tagReadsError, setTagReadsError] = useState("");
   
   // Assignment state
   const [assignDeptModal, setAssignDeptModal] = useState<number | null>(null);
@@ -84,6 +87,20 @@ export default function Dashboard() {
     }
   };
 
+  const fetchTagReads = async () => {
+    setTagReadsLoading(true);
+    setTagReadsError("");
+    try {
+      const records = await getTagReads();
+      setTagReads(records);
+    } catch (err) {
+      console.error(err);
+      setTagReadsError("Failed to load tag reads.");
+    } finally {
+      setTagReadsLoading(false);
+    }
+  };
+
   useEffect(() => {
     const userData = localStorage.getItem("user");
     if (!userData) {
@@ -94,6 +111,9 @@ export default function Dashboard() {
     setUser(parsedUser);
     fetchDocs();
     fetchUserDepartment();
+    if (currentPath === "/tag-reads") {
+      fetchTagReads();
+    }
 
     if (parsedUser.role_id === 1) {
       const fetchAdminData = async () => {
@@ -289,6 +309,7 @@ export default function Dashboard() {
         timestamp: formatDateTimeLocal(new Date()),
         rssi: -45,
       });
+      fetchTagReads();
     } catch (err: any) {
       console.error(err);
       const detail = err.response?.data?.detail;
@@ -709,6 +730,65 @@ export default function Dashboard() {
   "location": "Main Gate"
 }`}
                   </pre>
+                </div>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                <div className="p-6 border-b border-gray-100 flex items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">Recent Tag Reads</h3>
+                    <p className="text-sm text-gray-500 mt-1">Live records from `GET /api/tagreads`.</p>
+                  </div>
+                  <button
+                    onClick={fetchTagReads}
+                    className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium transition-colors text-gray-700"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${tagReadsLoading ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm whitespace-nowrap">
+                    <thead className="bg-gray-50 text-gray-500 border-b border-gray-200 font-medium tracking-wide">
+                      <tr>
+                        <th className="px-6 py-4">ID</th>
+                        <th className="px-6 py-4">EPC</th>
+                        <th className="px-6 py-4">Reader</th>
+                        <th className="px-6 py-4">Location</th>
+                        <th className="px-6 py-4">Antenna</th>
+                        <th className="px-6 py-4">RSSI</th>
+                        <th className="px-6 py-4">Timestamp</th>
+                        <th className="px-6 py-4">Created</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {tagReadsLoading ? (
+                        <tr>
+                          <td colSpan={8} className="px-6 py-8 text-center text-gray-400">Loading...</td>
+                        </tr>
+                      ) : tagReads.length > 0 ? (
+                        tagReads.map((tagRead) => (
+                          <tr key={tagRead.id} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-6 py-4 font-mono text-xs text-gray-500">#{tagRead.id}</td>
+                            <td className="px-6 py-4 font-mono text-gray-700">{tagRead.epc}</td>
+                            <td className="px-6 py-4 text-gray-900">{tagRead.reader_name}</td>
+                            <td className="px-6 py-4 text-gray-600">{tagRead.location}</td>
+                            <td className="px-6 py-4 text-gray-600">{tagRead.antenna}</td>
+                            <td className="px-6 py-4 text-gray-600">{tagRead.rssi}</td>
+                            <td className="px-6 py-4 text-gray-600">{new Date(tagRead.timestamp).toLocaleString()}</td>
+                            <td className="px-6 py-4 text-gray-500">{new Date(tagRead.created_at).toLocaleString()}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                            {tagReadsError || "No tag reads found"}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>

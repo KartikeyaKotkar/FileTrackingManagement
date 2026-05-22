@@ -27,7 +27,23 @@ export interface TagReadPayload {
   location: string;
 }
 
+export interface TagReadRecord {
+  id: number;
+  epc: string;
+  reader_name: string;
+  antenna: number;
+  timestamp: string;
+  rssi: number;
+  location: string;
+  created_at: string;
+}
+
 export const postTagRead = async (payload: TagReadPayload) => {
   const response = await api.post("/api/tagreads", payload);
   return response.data;
+};
+
+export const getTagReads = async (): Promise<TagReadRecord[]> => {
+  const response = await api.get("/api/tagreads");
+  return response.data.tag_reads;
 };
