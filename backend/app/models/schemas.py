@@ -107,7 +107,7 @@ class TagReadCreate(BaseModel):
                 "epc": "string",
                 "readerName": "string",
                 "antenna": 0,
-                "timestamp": "2026-05-21T00:00:00",
+                "timestamp": "2026-05-21T00:00:00Z",
                 "rssi": 0,
                 "location": "string",
             }
@@ -120,7 +120,7 @@ class TagReadCreate(BaseModel):
         validation_alias=AliasChoices("readerName", "reader_name"),
         serialization_alias="readerName",
     )
-    antenna: StrictInt
+    antenna: int
     timestamp: datetime
     rssi: StrictInt
     location: str
@@ -141,6 +141,19 @@ class TagReadCreate(BaseModel):
             raise ValueError("reader_name cannot be empty")
         return value
 
+    @field_validator("antenna", mode="before")
+    @classmethod
+    def validate_antenna(cls, value: object) -> object:
+        if isinstance(value, str):
+            value = value.strip()
+            if value == "":
+                raise ValueError("antenna cannot be empty")
+            try:
+                return int(value)
+            except ValueError as exc:
+                raise ValueError("antenna must be an integer") from exc
+        return value
+
     @field_validator("location")
     @classmethod
     def validate_location(cls, value: str) -> str:
@@ -152,5 +165,5 @@ class TagReadCreate(BaseModel):
     @classmethod
     def validate_timestamp(cls, value: datetime) -> datetime:
         if value.tzinfo is None or value.utcoffset() is None:
-            raise ValueError("timestamp must include timezone information")
+            value = value.replace(tzinfo=timezone.utc)
         return value.astimezone(timezone.utc)

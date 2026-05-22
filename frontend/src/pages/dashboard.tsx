@@ -15,6 +15,11 @@ interface Document {
   created_at: string;
 }
 
+const formatDateTimeLocal = (date: Date) => {
+  const offsetMs = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+};
+
 export default function Dashboard() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,8 +44,9 @@ export default function Dashboard() {
   const [tagReadForm, setTagReadForm] = useState({
     epc: "",
     reader_name: "",
+    location: "",
     antenna: 1,
-    timestamp: new Date().toISOString().slice(0, 16),
+    timestamp: formatDateTimeLocal(new Date()),
     rssi: -45,
   });
   const [tagReadSubmitting, setTagReadSubmitting] = useState(false);
@@ -266,8 +272,9 @@ export default function Dashboard() {
     try {
       const payload = {
         epc: tagReadForm.epc.trim(),
-        reader_name: tagReadForm.reader_name.trim(),
-        antenna: Number(tagReadForm.antenna),
+        readerName: tagReadForm.reader_name.trim(),
+        location: tagReadForm.location.trim(),
+        antenna: Math.trunc(Number(tagReadForm.antenna)),
         timestamp: new Date(tagReadForm.timestamp).toISOString(),
         rssi: Number(tagReadForm.rssi),
       };
@@ -277,8 +284,9 @@ export default function Dashboard() {
       setTagReadForm({
         epc: "",
         reader_name: "",
+        location: "",
         antenna: 1,
-        timestamp: new Date().toISOString().slice(0, 16),
+        timestamp: formatDateTimeLocal(new Date()),
         rssi: -45,
       });
     } catch (err: any) {
@@ -632,9 +640,22 @@ export default function Dashboard() {
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">Antenna</label>
                       <input
                         type="number"
+                        step="1"
                         value={tagReadForm.antenna}
                         onChange={(e) => setTagReadForm({ ...tagReadForm, antenna: Number(e.target.value) })}
                         className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Location</label>
+                      <input
+                        type="text"
+                        value={tagReadForm.location}
+                        onChange={(e) => setTagReadForm({ ...tagReadForm, location: e.target.value })}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Main Gate"
                         required
                       />
                     </div>
@@ -681,10 +702,11 @@ export default function Dashboard() {
                   <pre className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-xs text-gray-700 overflow-x-auto">
 {`{
   "epc": "300833B2DDD9014000000000",
-  "reader_name": "Gate Reader A",
+  "readerName": "Gate Reader A",
   "antenna": 1,
   "timestamp": "2026-05-14T12:00:00Z",
-  "rssi": -45
+  "rssi": -45,
+  "location": "Main Gate"
 }`}
                   </pre>
                 </div>

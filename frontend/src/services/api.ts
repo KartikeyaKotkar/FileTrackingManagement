@@ -20,10 +20,11 @@ api.interceptors.request.use((config) => {
 
 export interface TagReadPayload {
   epc: string;
-  reader_name: string;
+  readerName: string;
   antenna: number;
   timestamp: string;
   rssi: number;
+  location: string;
 }
 
 export const postTagRead = async (payload: TagReadPayload) => {

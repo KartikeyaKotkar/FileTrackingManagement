@@ -29,6 +29,22 @@ def test_tag_read_schema_accepts_reader_name_alias_and_location():
     assert data.timestamp.tzinfo == timezone.utc
 
 
+def test_tag_read_schema_coerces_string_antenna_and_naive_timestamp_to_utc():
+    payload = {
+        "epc": "EPC-123",
+        "readerName": "Reader A",
+        "antenna": "1",
+        "timestamp": "2026-05-21T00:00:00",
+        "rssi": -45,
+        "location": "Main Gate",
+    }
+
+    data = TagReadCreate.model_validate(payload)
+
+    assert data.antenna == 1
+    assert data.timestamp.isoformat() == "2026-05-21T00:00:00+00:00"
+
+
 def test_tag_read_schema_still_accepts_legacy_reader_name_field():
     payload = {
         "epc": "EPC-123",
