@@ -176,3 +176,15 @@ def test_tag_read_openapi_schema_shows_request_body_fields(monkeypatch):
 
     assert set(properties) == {"epc", "readerName", "antenna", "timestamp", "rssi", "location"}
     assert "get" in schema["paths"]["/api/tagreads"]
+
+
+def test_tag_read_sql_schema_includes_location_column():
+    root = Path(__file__).resolve().parents[2]
+    schema_paths = [
+        root / "SQL" / "schema" / "01_create_tables_postgres.sql",
+        root / "SQL" / "schema" / "03_create_tag_reads.sql",
+    ]
+
+    for schema_path in schema_paths:
+        sql_text = schema_path.read_text()
+        assert "location    TEXT" in sql_text or "location TEXT" in sql_text

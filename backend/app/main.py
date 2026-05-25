@@ -3,9 +3,11 @@ from app.routers.auth import router as auth_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.events import init_events_db
+from app.database import ensure_tag_reads_schema
 
 # Initialize the event DB schema
 init_events_db()
+ensure_tag_reads_schema()
 
 app = FastAPI(title="File Tracking System")
 

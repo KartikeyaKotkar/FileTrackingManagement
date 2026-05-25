@@ -289,3 +289,19 @@ def get_tag_reads():
         ORDER BY timestamp DESC, id DESC
         """
     )
+
+
+def ensure_tag_reads_schema():
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            try:
+                cur.execute(
+                    """
+                    ALTER TABLE tag_reads
+                    ADD COLUMN IF NOT EXISTS location TEXT
+                    """
+                )
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise

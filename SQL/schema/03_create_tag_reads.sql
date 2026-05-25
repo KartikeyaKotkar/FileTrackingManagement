@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS tag_reads (
     antenna     INTEGER NOT NULL,
     timestamp   TIMESTAMPTZ NOT NULL,
     rssi        INTEGER NOT NULL,
+    location    TEXT,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
