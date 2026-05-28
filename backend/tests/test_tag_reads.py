@@ -219,3 +219,97 @@ def test_tag_read_sql_schema_includes_location_column():
         assert "location    TEXT" in sql_text or "location TEXT" in sql_text
         assert "idx_tagread_dedupe" in sql_text
         assert "(epc, reader_name, antenna, timestamp)" in sql_text
+
+
+def test_export_csv_endpoint(monkeypatch):
+    expected = [
+        {
+            "id": 1,
+            "epc": "EPC-1",
+            "reader_name": "Reader A",
+            "antenna": 2,
+            "timestamp": "2026-05-28T12:00:00+00:00",
+            "rssi": -45,
+            "location": "Loc A",
+            "created_at": "2026-05-28T12:00:05+00:00",
+        }
+    ]
+    fake_database = types.ModuleType("app.database")
+    fake_database.create_tag_read = lambda *args, **kwargs: None
+    fake_database.get_tag_reads = lambda *args, **kwargs: expected
+    monkeypatch.setitem(sys.modules, "app.database", fake_database)
+
+    module_path = Path(__file__).resolve().parents[1] / "app" / "routers" / "tag_reads.py"
+    spec = importlib.util.spec_from_file_location("tag_reads_export_under_test", module_path)
+    tag_reads = importlib.util.module_from_spec(spec)
+    assert spec is not None
+    assert spec.loader is not None
+    spec.loader.exec_module(tag_reads)
+
+    response = asyncio.run(tag_reads.export_csv())
+    assert response.status_code == 200
+    assert response.media_type == "text/csv"
+    assert b"EPC-1" in response.body
+    assert b"Reader A" in response.body
+
+
+def test_export_excel_endpoint(monkeypatch):
+    expected = [
+        {
+            "id": 1,
+            "epc": "EPC-1",
+            "reader_name": "Reader A",
+            "antenna": 2,
+            "timestamp": "2026-05-28T12:00:00+00:00",
+            "rssi": -45,
+            "location": "Loc A",
+            "created_at": "2026-05-28T12:00:05+00:00",
+        }
+    ]
+    fake_database = types.ModuleType("app.database")
+    fake_database.create_tag_read = lambda *args, **kwargs: None
+    fake_database.get_tag_reads = lambda *args, **kwargs: expected
+    monkeypatch.setitem(sys.modules, "app.database", fake_database)
+
+    module_path = Path(__file__).resolve().parents[1] / "app" / "routers" / "tag_reads.py"
+    spec = importlib.util.spec_from_file_location("tag_reads_export_under_test", module_path)
+    tag_reads = importlib.util.module_from_spec(spec)
+    assert spec is not None
+    assert spec.loader is not None
+    spec.loader.exec_module(tag_reads)
+
+    response = asyncio.run(tag_reads.export_excel())
+    assert response.status_code == 200
+    assert response.media_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    assert len(response.body) > 0
+
+
+def test_export_pdf_endpoint(monkeypatch):
+    expected = [
+        {
+            "id": 1,
+            "epc": "EPC-1",
+            "reader_name": "Reader A",
+            "antenna": 2,
+            "timestamp": "2026-05-28T12:00:00+00:00",
+            "rssi": -45,
+            "location": "Loc A",
+            "created_at": "2026-05-28T12:00:05+00:00",
+        }
+    ]
+    fake_database = types.ModuleType("app.database")
+    fake_database.create_tag_read = lambda *args, **kwargs: None
+    fake_database.get_tag_reads = lambda *args, **kwargs: expected
+    monkeypatch.setitem(sys.modules, "app.database", fake_database)
+
+    module_path = Path(__file__).resolve().parents[1] / "app" / "routers" / "tag_reads.py"
+    spec = importlib.util.spec_from_file_location("tag_reads_export_under_test", module_path)
+    tag_reads = importlib.util.module_from_spec(spec)
+    assert spec is not None
+    assert spec.loader is not None
+    spec.loader.exec_module(tag_reads)
+
+    response = asyncio.run(tag_reads.export_pdf())
+    assert response.status_code == 200
+    assert response.media_type == "application/pdf"
+    assert response.body.startswith(b"%PDF")

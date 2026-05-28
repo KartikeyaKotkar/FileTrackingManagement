@@ -299,14 +299,28 @@ def create_tag_read(
                 raise
 
 
-def get_tag_reads():
-    return fetch_all(
-        """
-        SELECT id, epc, reader_name, antenna, timestamp, rssi, location, created_at
-        FROM tag_reads
-        ORDER BY timestamp DESC, id DESC
-        """
-    )
+def get_tag_reads(from_date: str = None, to_date: str = None, epc: str = None, reader_name: str = None):
+    query = "SELECT id, epc, reader_name, antenna, timestamp, rssi, location, created_at FROM tag_reads WHERE 1=1"
+    params = []
+    
+    if from_date:
+        query += " AND timestamp >= %s"
+        params.append(from_date)
+    if to_date:
+        query += " AND timestamp <= %s"
+        if len(to_date) == 10:
+            params.append(f"{to_date} 23:59:59.999999")
+        else:
+            params.append(to_date)
+    if epc:
+        query += " AND epc ILIKE %s"
+        params.append(f"%{epc}%")
+    if reader_name:
+        query += " AND reader_name ILIKE %s"
+        params.append(f"%{reader_name}%")
+        
+    query += " ORDER BY timestamp DESC, id DESC"
+    return fetch_all(query, params)
 
 
 def ensure_tag_reads_schema():

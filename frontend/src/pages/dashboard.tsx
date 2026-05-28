@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { api, getTagReads, postTagRead, type TagReadRecord } from "../services/api";
-import { FileText, LogOut, LayoutDashboard, Settings, Search, RefreshCw, Plus, X, Send, Radio } from "lucide-react";
+import { api, getTagReads, postTagRead, downloadTagReadsExport, type TagReadRecord, type TagReadFilters } from "../services/api";
+import { FileText, LogOut, LayoutDashboard, Settings, Search, RefreshCw, Plus, X, Send, Radio, ChevronDown, Download } from "lucide-react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 
 interface Document {
@@ -56,6 +56,15 @@ export default function Dashboard() {
   const [tagReadsLoading, setTagReadsLoading] = useState(false);
   const [tagReadsError, setTagReadsError] = useState("");
   
+  // Filtering and export states
+  const [tagReadFilters, setTagReadFilters] = useState<TagReadFilters>({
+    from_date: "",
+    to_date: "",
+    epc: "",
+    reader_name: "",
+  });
+  const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
+  
   // Assignment state
   const [assignDeptModal, setAssignDeptModal] = useState<number | null>(null);
   const [selectedDeptId, setSelectedDeptId] = useState<number | "">("");
@@ -87,17 +96,38 @@ export default function Dashboard() {
     }
   };
 
-  const fetchTagReads = async () => {
+  const fetchTagReads = async (filtersToUse = tagReadFilters) => {
     setTagReadsLoading(true);
     setTagReadsError("");
     try {
-      const records = await getTagReads();
+      const cleanFilters: TagReadFilters = {};
+      if (filtersToUse.from_date) cleanFilters.from_date = filtersToUse.from_date;
+      if (filtersToUse.to_date) cleanFilters.to_date = filtersToUse.to_date;
+      if (filtersToUse.epc) cleanFilters.epc = filtersToUse.epc.trim();
+      if (filtersToUse.reader_name) cleanFilters.reader_name = filtersToUse.reader_name.trim();
+
+      const records = await getTagReads(cleanFilters);
       setTagReads(records);
     } catch (err) {
       console.error(err);
       setTagReadsError("Failed to load tag reads.");
     } finally {
       setTagReadsLoading(false);
+    }
+  };
+
+  const handleExport = async (format: "csv" | "excel" | "pdf") => {
+    try {
+      const cleanFilters: TagReadFilters = {};
+      if (tagReadFilters.from_date) cleanFilters.from_date = tagReadFilters.from_date;
+      if (tagReadFilters.to_date) cleanFilters.to_date = tagReadFilters.to_date;
+      if (tagReadFilters.epc) cleanFilters.epc = tagReadFilters.epc.trim();
+      if (tagReadFilters.reader_name) cleanFilters.reader_name = tagReadFilters.reader_name.trim();
+
+      await downloadTagReadsExport(format, cleanFilters);
+    } catch (err) {
+      console.error("Export failed:", err);
+      alert("Failed to export. Please try again.");
     }
   };
 
@@ -734,18 +764,132 @@ export default function Dashboard() {
               </div>
 
               <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                <div className="p-6 border-b border-gray-100 flex items-center justify-between gap-4">
+                <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div>
                     <h3 className="text-lg font-bold text-gray-900">Recent Tag Reads</h3>
                     <p className="text-sm text-gray-500 mt-1">Live records from `GET /api/tagreads`.</p>
                   </div>
-                  <button
-                    onClick={fetchTagReads}
-                    className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium transition-colors text-gray-700"
-                  >
-                    <RefreshCw className={`w-4 h-4 ${tagReadsLoading ? 'animate-spin' : ''}`} />
-                    Refresh
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => fetchTagReads()}
+                      className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium transition-colors text-gray-700 shadow-sm"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${tagReadsLoading ? 'animate-spin' : ''}`} />
+                      Refresh
+                    </button>
+                    
+                    <div className="relative">
+                      <button
+                        onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+                      >
+                        <Download className="w-4 h-4" />
+                        Export
+                        <ChevronDown className="w-4 h-4" />
+                      </button>
+                      
+                      {exportDropdownOpen && (
+                        <>
+                          <div 
+                            className="fixed inset-0 z-30" 
+                            onClick={() => setExportDropdownOpen(false)} 
+                          />
+                          <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-40 animate-in fade-in slide-in-from-top-2 duration-200">
+                            <button
+                              onClick={() => {
+                                handleExport("csv");
+                                setExportDropdownOpen(false);
+                              }}
+                              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2.5"
+                            >
+                              <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                              Export CSV
+                            </button>
+                            <button
+                              onClick={() => {
+                                handleExport("excel");
+                                setExportDropdownOpen(false);
+                              }}
+                              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2.5"
+                            >
+                              <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                              Export Excel
+                            </button>
+                            <button
+                              onClick={() => {
+                                handleExport("pdf");
+                                setExportDropdownOpen(false);
+                              }}
+                              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2.5"
+                            >
+                              <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                              Export PDF
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Filters Section */}
+                <div className="p-6 bg-gray-50 border-b border-gray-200 grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">EPC</label>
+                    <input
+                      type="text"
+                      placeholder="Filter by EPC"
+                      value={tagReadFilters.epc}
+                      onChange={(e) => setTagReadFilters({ ...tagReadFilters, epc: e.target.value })}
+                      className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all animate-in"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Reader Name</label>
+                    <input
+                      type="text"
+                      placeholder="Filter by Reader"
+                      value={tagReadFilters.reader_name || ""}
+                      onChange={(e) => setTagReadFilters({ ...tagReadFilters, reader_name: e.target.value })}
+                      className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all animate-in"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">From Date</label>
+                    <input
+                      type="date"
+                      value={tagReadFilters.from_date || ""}
+                      onChange={(e) => setTagReadFilters({ ...tagReadFilters, from_date: e.target.value })}
+                      className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all animate-in"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">To Date</label>
+                    <input
+                      type="date"
+                      value={tagReadFilters.to_date || ""}
+                      onChange={(e) => setTagReadFilters({ ...tagReadFilters, to_date: e.target.value })}
+                      className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all animate-in"
+                    />
+                  </div>
+                  <div className="md:col-span-4 flex justify-end gap-3 pt-2">
+                    <button
+                      onClick={() => {
+                        const cleared = { from_date: "", to_date: "", epc: "", reader_name: "" };
+                        setTagReadFilters(cleared);
+                        fetchTagReads(cleared);
+                      }}
+                      className="px-4 py-2 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors"
+                    >
+                      Clear
+                    </button>
+                    <button
+                      onClick={() => fetchTagReads()}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg shadow-sm transition-colors animate-in"
+                    >
+                      Apply Filters
+                    </button>
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto">
