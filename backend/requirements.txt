@@ -6,3 +6,7 @@ python-dotenv
 requests
 jinja2
 orjson
+pandas
+openpyxl
+reportlab
+

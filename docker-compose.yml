@@ -33,6 +33,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "80:80"
+    volumes:
+      - ./frontend/dist:/usr/share/nginx/html
     depends_on:
       - backend
     restart: unless-stopped

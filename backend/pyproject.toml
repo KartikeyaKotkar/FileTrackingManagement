@@ -9,7 +9,10 @@ dependencies = [
     "pydantic",
     "requests",
     "jinja2",
-    "orjson"
+    "orjson",
+    "pandas",
+    "openpyxl",
+    "reportlab"
 ]
 
 [dependency-groups]
