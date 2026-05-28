@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from contextlib import contextmanager
@@ -261,10 +261,28 @@ def create_tag_read(
     location: str,
 ):
     timestamp_utc = timestamp.astimezone(timezone.utc)
+    duplicate_window = timestamp_utc - timedelta(seconds=5)
 
     with get_conn() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             try:
+                cur.execute(
+                    """
+                    SELECT id
+                    FROM tag_reads
+                    WHERE epc = %s
+                      AND reader_name = %s
+                      AND antenna = %s
+                      AND timestamp >= %s
+                    LIMIT 1
+                    """,
+                    (epc, reader_name, antenna, duplicate_window),
+                )
+                existing = cur.fetchone()
+                if existing:
+                    conn.commit()
+                    return {"duplicate": True}
+
                 cur.execute(
                     """
                     INSERT INTO tag_reads (epc, reader_name, antenna, timestamp, rssi, location)
@@ -313,6 +331,12 @@ def ensure_tag_reads_schema():
                     """
                     ALTER TABLE tag_reads
                     ADD COLUMN IF NOT EXISTS location TEXT
+                    """
+                )
+                cur.execute(
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_tagread_dedupe
+                    ON tag_reads (epc, reader_name, antenna, timestamp)
                     """
                 )
                 conn.commit()

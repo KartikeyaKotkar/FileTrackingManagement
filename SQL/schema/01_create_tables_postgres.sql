@@ -163,6 +163,8 @@ CREATE TABLE IF NOT EXISTS tag_reads (
 );
 
 CREATE INDEX IF NOT EXISTS idx_tag_reads_epc ON tag_reads (epc);
+CREATE INDEX IF NOT EXISTS idx_tagread_dedupe
+ON tag_reads (epc, reader_name, antenna, timestamp);
 
 -- ============================================================
 -- TRIGGERS

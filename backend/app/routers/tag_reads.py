@@ -25,6 +25,9 @@ async def create_tag_read_endpoint(data: TagReadCreate):
             rssi=data.rssi,
             location=data.location,
         )
+        if record and record.get("duplicate"):
+            return {"message": "Duplicate tag ignored"}
+
         return {
             "message": "Tag read created successfully",
             "tag_read": record,
