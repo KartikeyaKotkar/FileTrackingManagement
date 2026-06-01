@@ -114,16 +114,16 @@ class TagReadCreate(BaseModel):
         },
     )
 
-    epc: str
+    epc: str = Field(validation_alias=AliasChoices("epc", "EPC"))
     reader_name: str = Field(
         alias="readerName",
-        validation_alias=AliasChoices("readerName", "reader_name"),
+        validation_alias=AliasChoices("readerName", "reader_name", "ReaderName"),
         serialization_alias="readerName",
     )
-    antenna: int
-    timestamp: datetime
-    rssi: StrictInt
-    location: str
+    antenna: int = Field(validation_alias=AliasChoices("antenna", "Antenna"))
+    timestamp: datetime = Field(validation_alias=AliasChoices("timestamp", "Timestamp"))
+    rssi: StrictInt = Field(validation_alias=AliasChoices("rssi", "RSSI"))
+    location: str = Field(validation_alias=AliasChoices("location", "Location"))
 
     @field_validator("epc")
     @classmethod

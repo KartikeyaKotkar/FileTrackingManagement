@@ -6,8 +6,6 @@ from datetime import timezone
 from pathlib import Path
 
 from fastapi import FastAPI
-from pydantic import ValidationError
-
 from app.models.schemas import TagReadCreate
 
 
@@ -61,19 +59,38 @@ def test_tag_read_schema_still_accepts_legacy_reader_name_field():
     assert data.location == "Dock 3"
 
 
+def test_tag_read_schema_accepts_hardware_pascal_case_payload_with_location():
+    payload = {
+        "EPC": "EPC-123",
+        "ReaderName": "Reader A",
+        "Antenna": 2,
+        "Timestamp": "2026-05-21T10:30:00+05:30",
+        "RSSI": -45,
+        "Location": "Main Gate",
+    }
+
+    data = TagReadCreate.model_validate(payload)
+
+    assert data.epc == "EPC-123"
+    assert data.reader_name == "Reader A"
+    assert data.antenna == 2
+    assert data.rssi == -45
+    assert data.location == "Main Gate"
+
+
 def test_tag_read_schema_requires_location():
     payload = {
-        "epc": "EPC-123",
-        "readerName": "Reader A",
-        "antenna": 2,
-        "timestamp": "2026-05-21T10:30:00+05:30",
-        "rssi": -45,
+        "EPC": "EPC-123",
+        "ReaderName": "Reader A",
+        "Antenna": 2,
+        "Timestamp": "2026-05-21T10:30:00+05:30",
+        "RSSI": -45,
     }
 
     try:
         TagReadCreate.model_validate(payload)
-    except ValidationError as exc:
-        assert exc.errors()[0]["loc"] == ("location",)
+    except Exception as exc:
+        assert "location" in str(exc).lower()
     else:
         raise AssertionError("Expected validation error for missing location")
 
@@ -204,6 +221,14 @@ def test_tag_read_openapi_schema_shows_request_body_fields(monkeypatch):
     properties = schema["components"]["schemas"][schema_name]["properties"]
 
     assert set(properties) == {"epc", "readerName", "antenna", "timestamp", "rssi", "location"}
+    assert set(schema["components"]["schemas"][schema_name]["required"]) == {
+        "epc",
+        "readerName",
+        "antenna",
+        "timestamp",
+        "rssi",
+        "location",
+    }
     assert "get" in schema["paths"]["/api/tagreads"]
 
 

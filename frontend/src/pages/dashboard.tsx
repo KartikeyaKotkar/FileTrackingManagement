@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, getTagReads, postTagRead, downloadTagReadsExport, type TagReadRecord, type TagReadFilters } from "../services/api";
-import { FileText, LogOut, LayoutDashboard, Settings, Search, RefreshCw, Plus, X, Send, Radio, ChevronDown, Download } from "lucide-react";
+import { FileText, LogOut, LayoutDashboard, Settings, Search, RefreshCw, Plus, X, Send, Radio, ChevronDown, Download, UserRound, Hash, MapPin, Users, Building2, Clock3, Activity } from "lucide-react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 
 interface Document {
@@ -73,6 +73,55 @@ export default function Dashboard() {
   const location = useLocation();
   const currentPath = location.pathname;
 
+  const uniqueTagCount = useMemo(() => {
+    const epcs = new Set(tagReads.map((record) => record.epc).filter(Boolean));
+    return epcs.size;
+  }, [tagReads]);
+
+  const dashboardLocation = useMemo(() => {
+    if (user?.department_name) return user.department_name;
+    if (user?.department_id) {
+      const dept = departmentsList.find((item) => item.id === user.department_id);
+      if (dept?.name) return dept.name;
+    }
+    return tagReads[0]?.location || "Unassigned";
+  }, [departmentsList, tagReads, user]);
+
+  const latestTagLocation = tagReads[0]?.location || "No tag reads yet";
+
+  const documentStatusItems = useMemo(() => {
+    const counts = documents.reduce<Record<string, number>>((acc, doc) => {
+      const status = doc.status || "Active";
+      acc[status] = (acc[status] || 0) + 1;
+      return acc;
+    }, {});
+
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([label, count]) => ({ label, count }));
+  }, [documents]);
+
+  const topReaderItems = useMemo(() => {
+    const counts = tagReads.reduce<Record<string, number>>((acc, record) => {
+      const reader = record.reader_name || "Unknown reader";
+      acc[reader] = (acc[reader] || 0) + 1;
+      return acc;
+    }, {});
+
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([label, count]) => ({ label, count }));
+  }, [tagReads]);
+
+  const activeUserCount = useMemo(() => {
+    return usersList.filter((item) => item.is_active === 1 || item.is_active === true).length;
+  }, [usersList]);
+
+  const taggedDocumentCount = useMemo(() => {
+    return documents.filter((doc) => Boolean(doc.tag_number)).length;
+  }, [documents]);
+
   const fetchDocs = async () => {
     setLoading(true);
     try {
@@ -141,21 +190,23 @@ export default function Dashboard() {
     setUser(parsedUser);
     fetchDocs();
     fetchUserDepartment();
-    if (currentPath === "/tag-reads") {
+    if (currentPath === "/dashboard" || currentPath === "/tag-reads") {
       fetchTagReads();
     }
 
     if (parsedUser.role_id === 1) {
       const fetchAdminData = async () => {
         try {
-          const [statsRes, logsRes, transfersRes] = await Promise.all([
+          const [statsRes, logsRes, transfersRes, usersRes] = await Promise.all([
             api.get("/admin/dashboard"),
             api.get("/admin/logs"),
-            api.get("/transfer/pending")
+            api.get("/transfer/pending"),
+            api.get("/auth/users")
           ]);
           setAdminStats(statsRes.data);
           setAdminLogs(logsRes.data);
           setPendingTransfers(transfersRes.data);
+          setUsersList(usersRes.data);
           
           if (currentPath === "/departments-view") {
               const deptsRes = await api.get("/departments/");
@@ -439,9 +490,95 @@ export default function Dashboard() {
                  <h2 className="text-2xl font-bold text-gray-900">{user?.role_id === 1 ? "Admin Monitoring Panel" : "Dashboard"}</h2>
                  <p className="text-gray-500 text-sm mt-1">Welcome back, {user?.fullname || user?.username}. Here is your system overview.</p>
                </div>
+
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                 <SummaryCard
+                   icon={<UserRound className="w-5 h-5" />}
+                   label="Logged In User"
+                   value={user?.fullname || user?.username || "Unknown"}
+                   detail={`@${user?.username || "user"} • ${user?.role_id === 1 ? "Administrator" : "Standard User"}`}
+                   tone="blue"
+                 />
+                 <SummaryCard
+                   icon={<Hash className="w-5 h-5" />}
+                   label="Total Tags"
+                   value={uniqueTagCount.toString()}
+                   detail={`${tagReads.length} tag reads recorded`}
+                   tone="emerald"
+                 />
+                 <SummaryCard
+                   icon={<MapPin className="w-5 h-5" />}
+                   label="User Location"
+                   value={dashboardLocation}
+                   detail={`Latest tag read: ${latestTagLocation}`}
+                   tone="amber"
+                 />
+               </div>
                
                {user?.role_id === 1 && adminStats ? (
                  <div className="space-y-6">
+                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                     <SummaryCard
+                       icon={<FileText className="w-5 h-5" />}
+                       label="Documents"
+                       value={documents.length.toString()}
+                       detail={`${taggedDocumentCount} tagged, ${documents.length - taggedDocumentCount} untagged`}
+                       tone="slate"
+                     />
+                     <SummaryCard
+                       icon={<Clock3 className="w-5 h-5" />}
+                       label="Pending Transfers"
+                       value={pendingTransfers.length.toString()}
+                       detail={pendingTransfers.length > 0 ? "Needs admin review" : "No queue items"}
+                       tone="rose"
+                     />
+                     <SummaryCard
+                       icon={<Users className="w-5 h-5" />}
+                       label="Active Users"
+                       value={activeUserCount.toString()}
+                       detail={`${usersList.length} total accounts`}
+                       tone="violet"
+                     />
+                     <SummaryCard
+                       icon={<Building2 className="w-5 h-5" />}
+                       label="Departments"
+                       value={departmentsList.length.toString()}
+                       detail="Assigned office groups"
+                       tone="blue"
+                     />
+                   </div>
+
+                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                     <AdminListPanel
+                       title="Document Status"
+                       emptyText="No documents yet."
+                       items={documentStatusItems}
+                     />
+                     <AdminListPanel
+                       title="Top RFID Readers"
+                       emptyText="No tag reads yet."
+                       items={topReaderItems}
+                     />
+                     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                       <div className="flex items-center justify-between mb-5">
+                         <h3 className="text-lg font-bold text-gray-900">Latest Tag Reads</h3>
+                         <Activity className="w-5 h-5 text-gray-400" />
+                       </div>
+                       <div className="space-y-3">
+                         {tagReads.slice(0, 5).map((record) => (
+                           <div key={record.id} className="flex items-start justify-between gap-3 border-b border-gray-100 pb-3 last:border-0 last:pb-0">
+                             <div className="min-w-0">
+                               <p className="font-mono text-xs text-gray-900 truncate">{record.epc}</p>
+                               <p className="text-sm text-gray-500 truncate">{record.reader_name} • {record.location}</p>
+                             </div>
+                             <span className="text-xs text-gray-400 whitespace-nowrap">{new Date(record.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                           </div>
+                         ))}
+                         {tagReads.length === 0 && <p className="text-sm text-gray-500">{tagReadsError || "No tag reads yet."}</p>}
+                       </div>
+                     </div>
+                   </div>
+
                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                        <h3 className="text-lg font-bold text-gray-900 mb-6">Action Volume Distribution</h3>
@@ -508,7 +645,7 @@ export default function Dashboard() {
                    </div>
                  </div>
                ) : (
-                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col">
                      <h3 className="text-gray-500 text-sm font-medium mb-2">Total Documents</h3>
                      <span className="text-4xl font-bold text-gray-900">{documents.length || 0}</span>
@@ -518,7 +655,7 @@ export default function Dashboard() {
                      <span className="text-lg font-bold text-blue-600">{user?.role_id === 1 ? "Administrator" : "Standard User"}</span>
                    </div>
 
-                   <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden md:col-span-2 lg:col-span-3">
+                   <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden md:col-span-2">
                      <div className="p-6 border-b border-gray-100">
                         <h3 className="text-lg font-bold text-gray-900">Recent Department Activity</h3>
                      </div>
@@ -1285,5 +1422,79 @@ function NavItem({ icon, label, active = false, to }: { icon: React.ReactNode, l
       {icon}
       <span className="hidden lg:block text-sm">{label}</span>
     </Link>
+  );
+}
+
+function SummaryCard({
+  icon,
+  label,
+  value,
+  detail,
+  tone,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  detail: string;
+  tone: "blue" | "emerald" | "amber" | "slate" | "rose" | "violet";
+}) {
+  const tones = {
+    blue: "bg-blue-50 text-blue-700 ring-blue-100",
+    emerald: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+    amber: "bg-amber-50 text-amber-700 ring-amber-100",
+    slate: "bg-slate-50 text-slate-700 ring-slate-100",
+    rose: "bg-rose-50 text-rose-700 ring-rose-100",
+    violet: "bg-violet-50 text-violet-700 ring-violet-100",
+  };
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 min-w-0">
+      <div className="flex items-start gap-4">
+        <div className={`w-11 h-11 rounded-lg ring-1 flex items-center justify-center flex-shrink-0 ${tones[tone]}`}>
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs font-bold uppercase text-gray-500 tracking-wide">{label}</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900 truncate" title={value}>
+            {value}
+          </p>
+          <p className="mt-1 text-sm text-gray-500 truncate" title={detail}>
+            {detail}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminListPanel({
+  title,
+  items,
+  emptyText,
+}: {
+  title: string;
+  items: Array<{ label: string; count: number }>;
+  emptyText: string;
+}) {
+  const max = Math.max(...items.map((item) => item.count), 1);
+
+  return (
+    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+      <h3 className="text-lg font-bold text-gray-900 mb-5">{title}</h3>
+      <div className="space-y-4">
+        {items.map((item) => (
+          <div key={item.label}>
+            <div className="flex items-center justify-between gap-3 text-sm mb-1.5">
+              <span className="font-medium text-gray-700 truncate">{item.label}</span>
+              <span className="font-mono text-gray-500">{item.count}</span>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.max((item.count / max) * 100, 8)}%` }} />
+            </div>
+          </div>
+        ))}
+        {items.length === 0 && <p className="text-sm text-gray-500">{emptyText}</p>}
+      </div>
+    </div>
   );
 }
