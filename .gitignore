@@ -21,3 +21,4 @@ node_modules/
 references/
 stats.txt
 .antigravitycli/
+backend/.pytest_cache/
